@@ -102,7 +102,7 @@ class OllamaClient:
             "options": {
                 "temperature": temperature,
                 "num_predict": num_predict,
-                "top_p": 0.9,
+                "top_p": config.ollama_top_p,
             },
         }
         if fmt is not None:

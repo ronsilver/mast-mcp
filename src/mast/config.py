@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
+
+MastMode = Literal["passive", "validate", "debate"]
+FormatMode = Literal["schema", "json", "text"]
 
 
 class MastConfig(BaseSettings):
@@ -18,12 +23,16 @@ class MastConfig(BaseSettings):
     judge_model: str = Field(default="deepseek-r1:8b", alias="JUDGE_MODEL")
 
     # Behaviour
-    mast_mode: str = Field(default="debate", alias="MAST_MODE")
+    mast_mode: MastMode = Field(default="debate", alias="MAST_MODE")
     mast_timeout_ms: int = Field(default=15_000, alias="MAST_TIMEOUT_MS")
     mast_cache_ttl_s: int = Field(default=300, alias="MAST_CACHE_TTL_S")
     mast_max_history: int = Field(default=50, alias="MAST_MAX_HISTORY")
     mast_history_window: int = Field(default=3, alias="MAST_HISTORY_WINDOW")
     mast_history_max_tokens: int = Field(default=1500, alias="MAST_HISTORY_MAX_TOKENS")
+
+    # Validation tuning
+    mast_skip_threshold_chars: int = Field(default=20, alias="MAST_SKIP_THRESHOLD_CHARS")
+    ollama_top_p: float = Field(default=0.9, alias="OLLAMA_TOP_P")
 
     # Upstream compat
     disable_thought_logging: bool = Field(default=False, alias="DISABLE_THOUGHT_LOGGING")
@@ -32,7 +41,7 @@ class MastConfig(BaseSettings):
     #   "schema" — pass full JSON Schema (Ollama 0.5+, best conformance)
     #   "json"   — pass "json" string (legacy, broad compatibility)
     #   "text"   — omit format field (for proxies that don't support it)
-    mast_format_mode: str = Field(default="schema", alias="MAST_FORMAT_MODE")
+    mast_format_mode: FormatMode = Field(default="schema", alias="MAST_FORMAT_MODE")
 
     # ANSI colours in format_thought console output
     color_thought_logging: bool = Field(default=False, alias="MAST_COLOR_THOUGHTS")
@@ -40,7 +49,7 @@ class MastConfig(BaseSettings):
     # Logging
     mast_log_level: str = Field(default="INFO", alias="MAST_LOG_LEVEL")
 
-    @field_validator("mast_format_mode")
+    @field_validator("mast_format_mode", mode="before")
     @classmethod
     def validate_format_mode(cls, v: str) -> str:
         allowed = {"schema", "json", "text"}
@@ -48,7 +57,7 @@ class MastConfig(BaseSettings):
             raise ValueError(f"MAST_FORMAT_MODE must be one of {allowed}, got {v!r}")
         return v
 
-    @field_validator("mast_mode")
+    @field_validator("mast_mode", mode="before")
     @classmethod
     def validate_mode(cls, v: str) -> str:
         allowed = {"passive", "validate", "debate"}

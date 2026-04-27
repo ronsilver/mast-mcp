@@ -19,8 +19,6 @@ from mast.validation.schemas import (
 
 log = structlog.get_logger(__name__)
 
-_SKIP_THRESHOLD_CHARS = 20  # thoughts shorter than this are skipped
-
 
 def _build_history_summary(
     history: list[ThoughtData],
@@ -101,7 +99,7 @@ class ValidationOrchestrator:
         if mode == "passive":
             return base
 
-        if len(thought.thought.strip()) < _SKIP_THRESHOLD_CHARS:
+        if len(thought.thought.strip()) < config.mast_skip_threshold_chars:
             log.info("validation_skipped_short_thought", trace_id=trace_id)
             return base
 
