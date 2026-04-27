@@ -56,15 +56,48 @@ class SequentialThinkingServer:
         if not isinstance(data.get("nextThoughtNeeded"), bool):
             raise ValueError("'nextThoughtNeeded' must be a boolean")
 
+        revises_thought: int | None = data.get("revisesThought")
+        branch_from_thought: int | None = data.get("branchFromThought")
+        branch_id: str | None = data.get("branchId")
+
+        # Validate that revisesThought references an existing thought
+        if revises_thought is not None:
+            existing = {t.thought_number for t in self.thought_history}
+            if revises_thought not in existing:
+                raise ValueError(
+                    f"'revisesThought' #{revises_thought} does not reference an existing thought"
+                )
+
+        # branchId and branchFromThought must appear together
+        if (branch_id is None) != (branch_from_thought is None):
+            raise ValueError(
+                "'branchId' and 'branchFromThought' must both be present or both absent"
+            )
+
+        # branchFromThought must reference an existing thought
+        if branch_from_thought is not None:
+            existing = {t.thought_number for t in self.thought_history}
+            if branch_from_thought not in existing:
+                raise ValueError(
+                    f"'branchFromThought' #{branch_from_thought} does not reference an existing thought"  # noqa: E501
+                )
+
+        thought_number: int = data["thoughtNumber"]
+        total_thoughts: int = data["totalThoughts"]
+
+        # Auto-extend totalThoughts when thoughtNumber exceeds it (mirrors upstream)
+        if thought_number > total_thoughts:
+            total_thoughts = thought_number
+
         return ThoughtData(
             thought=data["thought"],
-            thought_number=data["thoughtNumber"],
-            total_thoughts=data["totalThoughts"],
+            thought_number=thought_number,
+            total_thoughts=total_thoughts,
             next_thought_needed=data["nextThoughtNeeded"],
             is_revision=bool(data.get("isRevision", False)),
-            revises_thought=data.get("revisesThought"),
-            branch_from_thought=data.get("branchFromThought"),
-            branch_id=data.get("branchId"),
+            revises_thought=revises_thought,
+            branch_from_thought=branch_from_thought,
+            branch_id=branch_id,
             needs_more_thoughts=bool(data.get("needsMoreThoughts", False)),
         )
 

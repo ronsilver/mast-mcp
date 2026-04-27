@@ -2,14 +2,25 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from mast._upstream import SequentialThinkingServer
+from mast._upstream_tool import SEQUENTIAL_THINKING_INPUT_SCHEMA
+
+FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 @pytest.fixture
 def server() -> SequentialThinkingServer:
     return SequentialThinkingServer()
+
+
+# ---------------------------------------------------------------------------
+# Basic behaviour
+# ---------------------------------------------------------------------------
 
 
 def test_basic_thought(server: SequentialThinkingServer) -> None:
@@ -78,8 +89,7 @@ def test_branch_thought(server: SequentialThinkingServer) -> None:
         }
     )
     assert "branch-a" in resp["branches"]
-    # branch thoughts don't increment main history
-    assert resp["thoughtHistoryLength"] == 1
+    assert resp["thoughtHistoryLength"] == 1  # branch thoughts don't increment main history
 
 
 def test_missing_required_fields(server: SequentialThinkingServer) -> None:
@@ -123,3 +133,103 @@ def test_passive_output_shape(server: SequentialThinkingServer) -> None:
         "thoughtHistoryLength",
     }
     assert required_keys.issubset(resp.keys()), f"Missing keys: {required_keys - resp.keys()}"
+
+
+# ---------------------------------------------------------------------------
+# P1.2 — Schema parity with upstream fixture
+# ---------------------------------------------------------------------------
+
+
+def test_tool_schema_matches_upstream() -> None:
+    """Our exported schema must match the upstream fixture exactly.
+
+    Intentional extensions (mode, skipValidation) only exist in mast_debate;
+    the sequentialthinking schema must be a 1:1 port.
+    """
+    expected = json.loads((FIXTURES / "upstream_tool_schema.json").read_text())
+    actual = SEQUENTIAL_THINKING_INPUT_SCHEMA
+
+    assert actual["type"] == expected["type"]
+    assert set(actual["required"]) == set(expected["required"])
+
+    expected_props: dict[str, object] = expected["properties"]
+    actual_props: dict[str, object] = actual["properties"]
+
+    # Every upstream property must be present with matching type
+    for prop, spec in expected_props.items():
+        assert prop in actual_props, f"Missing property: {prop!r}"
+        assert actual_props[prop]["type"] == spec["type"], f"Type mismatch for {prop!r}"  # type: ignore[index]
+
+
+# ---------------------------------------------------------------------------
+# P1.3 — Validations that upstream enforces
+# ---------------------------------------------------------------------------
+
+
+def test_revises_thought_must_exist(server: SequentialThinkingServer) -> None:
+    """revisesThought must reference an existing thought number."""
+    server.process_thought(
+        {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
+    )
+    with pytest.raises(ValueError, match="revisesThought"):
+        server.process_thought(
+            {
+                "thought": "Revise nonexistent",
+                "thoughtNumber": 2,
+                "totalThoughts": 3,
+                "nextThoughtNeeded": False,
+                "isRevision": True,
+                "revisesThought": 99,
+            }
+        )
+
+
+def test_branch_from_thought_must_exist(server: SequentialThinkingServer) -> None:
+    """branchFromThought must reference an existing thought number."""
+    server.process_thought(
+        {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
+    )
+    with pytest.raises(ValueError, match="branchFromThought"):
+        server.process_thought(
+            {
+                "thought": "Branch from nonexistent",
+                "thoughtNumber": 2,
+                "totalThoughts": 3,
+                "nextThoughtNeeded": False,
+                "branchFromThought": 99,
+                "branchId": "branch-x",
+            }
+        )
+
+
+def test_branch_id_and_branch_from_must_both_be_present(
+    server: SequentialThinkingServer,
+) -> None:
+    """branchId without branchFromThought (and vice versa) must raise."""
+    server.process_thought(
+        {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
+    )
+    # branchId alone
+    with pytest.raises(ValueError, match="branchId"):
+        server.process_thought(
+            {
+                "thought": "Orphan branch",
+                "thoughtNumber": 2,
+                "totalThoughts": 3,
+                "nextThoughtNeeded": False,
+                "branchId": "alone",
+            }
+        )
+
+
+def test_total_thoughts_auto_extends(server: SequentialThinkingServer) -> None:
+    """When thoughtNumber > totalThoughts, totalThoughts is auto-extended."""
+    resp = server.process_thought(
+        {
+            "thought": "Overflow",
+            "thoughtNumber": 5,
+            "totalThoughts": 3,
+            "nextThoughtNeeded": False,
+        }
+    )
+    assert resp["totalThoughts"] == 5
