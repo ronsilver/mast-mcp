@@ -28,8 +28,25 @@ class MastConfig(BaseSettings):
     # Upstream compat
     disable_thought_logging: bool = Field(default=False, alias="DISABLE_THOUGHT_LOGGING")
 
+    # JSON format mode for Ollama /api/chat:
+    #   "schema" — pass full JSON Schema (Ollama 0.5+, best conformance)
+    #   "json"   — pass "json" string (legacy, broad compatibility)
+    #   "text"   — omit format field (for proxies that don't support it)
+    mast_format_mode: str = Field(default="schema", alias="MAST_FORMAT_MODE")
+
+    # ANSI colours in format_thought console output
+    color_thought_logging: bool = Field(default=False, alias="MAST_COLOR_THOUGHTS")
+
     # Logging
     mast_log_level: str = Field(default="INFO", alias="MAST_LOG_LEVEL")
+
+    @field_validator("mast_format_mode")
+    @classmethod
+    def validate_format_mode(cls, v: str) -> str:
+        allowed = {"schema", "json", "text"}
+        if v not in allowed:
+            raise ValueError(f"MAST_FORMAT_MODE must be one of {allowed}, got {v!r}")
+        return v
 
     @field_validator("mast_mode")
     @classmethod

@@ -62,6 +62,7 @@ class CriticAgent:
             temperature=0.2,
             num_predict=512,
             fallback=_CRITIC_FALLBACK,
+            json_schema=CriticResponse.model_json_schema(),
         )
 
         try:

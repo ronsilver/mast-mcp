@@ -61,6 +61,7 @@ class JudgeAgent:
             temperature=0.4,
             num_predict=1024,
             fallback=_JUDGE_FALLBACK,
+            json_schema=JudgeResponse.model_json_schema(),
         )
 
         try:
