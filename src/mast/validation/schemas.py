@@ -117,8 +117,35 @@ class ValidationResult(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+# ---------------------------------------------------------------------------
+# De Bono Six Hats schemas
+# ---------------------------------------------------------------------------
+
+
+class HatName(StrEnum):
+    BLUE_OPEN = "blue_open"
+    WHITE = "white"
+    GREEN = "green"
+    YELLOW = "yellow"
+    BLACK = "black"
+    RED = "red"
+    BLUE_CLOSE = "blue_close"
+
+
+class HatOutput(BaseModel):
+    hat: HatName
+    model: str
+    latency_ms: int
+    rationale: str = Field(default="", max_length=120)
+
+
+class DebonoResult(BaseModel):
+    hats: list[HatOutput] = Field(default_factory=list)
+    total_latency_ms: int = 0
+
+
 class MastOutput(SequentialThinkingOutput):
-    """Extended output for validate/debate modes."""
+    """Extended output for validate/debate/debono modes."""
 
     validation: ValidationResult | None = None
     verdict: Verdict | None = None
@@ -126,6 +153,7 @@ class MastOutput(SequentialThinkingOutput):
     suggested_revision: str | None = Field(default=None, serialization_alias="suggestedRevision")
     judge_model: str | None = Field(default=None, serialization_alias="judgeModel")
     judge_latency_ms: int | None = Field(default=None, serialization_alias="judgeLatencyMs")
+    debono: DebonoResult | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(by_alias=True, exclude_none=True)

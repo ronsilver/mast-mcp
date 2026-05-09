@@ -58,13 +58,17 @@ async def _call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
     elif name == "mast_debate":
         critic_model = arguments.pop("criticModel", None)
         judge_model = arguments.pop("judgeModel", None)
+        debono_primary = arguments.pop("debonoPrimaryModel", None)
+        debono_creative = arguments.pop("debonoCreativeModel", None)
+        user_mode = arguments.get("mode") or config.mast_mode
+        force_mode = "debate" if user_mode == "debate" else user_mode
         result = await _handle_thought(
             arguments,
             upstream=upstream,
             orchestrator=orchestrator,
-            force_mode="debate",
-            critic_model=critic_model,
-            judge_model=judge_model,
+            force_mode=force_mode,
+            critic_model=critic_model or debono_primary,
+            judge_model=judge_model or debono_creative,
         )
     else:
         raise ValueError(f"Unknown tool: {name!r}")

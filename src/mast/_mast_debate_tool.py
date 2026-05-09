@@ -8,13 +8,18 @@ from typing import Any
 from mast._upstream_tool import SEQUENTIAL_THINKING_INPUT_SCHEMA
 
 MAST_DEBATE_TOOL_DESCRIPTION = """\
-Forces debate mode (Critic + Judge) regardless of server defaults.
-Use when you want maximum validation quality for a critical reasoning step.
-The thought is evaluated by two local Ollama models: a Critic identifies flaws,
-and a Judge synthesizes a final verdict (accept / revise / reject) with optional
+Forces debate mode (Critic + Judge) or debono mode (Six Thinking Hats) regardless of
+server defaults. Use for maximum validation quality on critical reasoning steps.
+
+In debate mode: the thought is evaluated by two local Ollama models: a Critic identifies
+flaws, and a Judge synthesizes a final verdict (accept / revise / reject) with optional
 suggested revision.
 
-Accepts optional criticModel and judgeModel to override the default models per call.
+In debono mode: the thought passes through 7 sequential De Bono hats (Blue Open, White,
+Green, Yellow, Black, Red, Blue Close) that progressively refine a working document and
+produce a verdict.
+
+Accepts optional model overrides per call.
 All other parameters are identical to the sequentialthinking tool.\
 """
 
@@ -27,7 +32,15 @@ _props["criticModel"] = {
 }
 _props["judgeModel"] = {
     "type": "string",
-    "description": "Override the Judge model for this call (e.g. 'mistral:7b-instruct')",
+    "description": "Override the Judge model for this call (e.g. 'deepseek-r1:8b')",
+}
+_props["debonoPrimaryModel"] = {
+    "type": "string",
+    "description": "Override main De Bono model (qwen2.5:3b) for white/yellow/black/blue",
+}
+_props["debonoCreativeModel"] = {
+    "type": "string",
+    "description": "Override the creative De Bono model (default: qwen2.5:1.5b) for green/red hats",
 }
 _base["properties"] = _props
 

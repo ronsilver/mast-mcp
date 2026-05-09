@@ -1,4 +1,4 @@
-"""Validation orchestrator — assembles Critic + Judge based on mode."""
+"""Validation orchestrator — assembles Critic + Judge or debono pipeline based on mode."""
 
 from __future__ import annotations
 
@@ -9,12 +9,14 @@ import structlog
 from mast._upstream import ThoughtData
 from mast.agents.base import OllamaClient
 from mast.agents.critic import CriticAgent
+from mast.agents.debono import DebonoOrchestrator
 from mast.agents.judge import JudgeAgent
 from mast.config import config
 from mast.validation.cache import ValidationCache
 from mast.validation.schemas import (
     MastOutput,
     ValidationResult,
+    Verdict,
 )
 
 log = structlog.get_logger(__name__)
@@ -70,6 +72,7 @@ class ValidationOrchestrator:
         self._client = OllamaClient()
         self._critic = CriticAgent(self._client)
         self._judge = JudgeAgent(self._client)
+        self._debono: DebonoOrchestrator | None = None
         self._cache: ValidationCache[MastOutput] = ValidationCache(
             ttl_seconds=config.mast_cache_ttl_s
         )
@@ -121,6 +124,44 @@ class ValidationOrchestrator:
         if cached is not None:
             log.info("validation_cache_hit", trace_id=trace_id)
             return cached
+
+        # --- De Bono mode (full pipeline, no Critic/Judge) ---
+        if mode == "debono":
+            if self._debono is None:
+                self._debono = DebonoOrchestrator(self._client)
+            debono_result, blue_close = await self._debono.run(
+                thought=thought.thought,
+                thought_number=thought.thought_number,
+                total_thoughts=thought.total_thoughts,
+                history_summary=history_summary,
+                is_revision=thought.is_revision,
+                revises_thought=thought.revises_thought,
+                branch_id=thought.branch_id,
+                branch_from=thought.branch_from_thought,
+                primary_model=critic_model,
+                creative_model=judge_model,
+            )
+            base.debono = debono_result
+            verdict_raw = blue_close.get("verdict", "accept")
+            try:
+                base.verdict = Verdict(verdict_raw)
+            except ValueError:
+                base.verdict = Verdict.ACCEPT
+            base.confidence = float(blue_close.get("confidence", 0.5))
+            base.suggested_revision = blue_close.get("suggested_revision")
+            base.judge_model = debono_result.hats[-1].model if debono_result.hats else None
+            base.judge_latency_ms = debono_result.total_latency_ms
+
+            log.info(
+                "debono_done",
+                trace_id=trace_id,
+                thought_number=thought.thought_number,
+                hats=len(debono_result.hats),
+                verdict=base.verdict.value if base.verdict else None,
+                total_latency_ms=debono_result.total_latency_ms,
+            )
+            self._cache.set(cache_key, base)
+            return base
 
         # --- Critic ---
         critic_response, critic_latency = await self._critic.critique(
