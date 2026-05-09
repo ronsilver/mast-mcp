@@ -15,8 +15,8 @@ jobs:
         with:
           version: "latest"
       - run: uv sync --extra dev
-      - run: uv run ruff check src/ tests/
-      - run: uv run ruff format --check src/ tests/
+      - run: uv run ruff check src/ tests/ evals/
+      - run: uv run ruff format --check src/ tests/ evals/
       - run: uv run mypy src/ tests/
 
   test:

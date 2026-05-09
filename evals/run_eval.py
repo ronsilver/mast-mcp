@@ -29,7 +29,6 @@ from mast.agents.base import OllamaClient
 from mast.agents.critic import CriticAgent
 from mast.agents.judge import JudgeAgent
 from mast.config import config
-from mast.validation.schemas import CriticResponse
 
 
 def _parse_models(flag: str | None, env_key: str, fallback: str) -> list[str]:
@@ -55,7 +54,7 @@ async def _eval_pair(
     critic = CriticAgent(client)
     judge = JudgeAgent(client)
 
-    ts = datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
     out_path = output_dir / _sanitize(critic_model) / _sanitize(judge_model) / f"{ts}.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -147,8 +146,12 @@ async def _main(args: argparse.Namespace) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--critic-models", default=None, help="Comma-separated list of critic models")
-    parser.add_argument("--judge-models", default=None, help="Comma-separated list of judge models")
+    parser.add_argument(
+        "--critic-models", default=None, help="Comma-separated list of critic models"
+    )
+    parser.add_argument(
+        "--judge-models", default=None, help="Comma-separated list of judge models"
+    )
     parser.add_argument("--dataset", default="evals/dataset.jsonl", help="Path to dataset JSONL")
     parser.add_argument("--output", default="evals/results", help="Output directory for results")
     asyncio.run(_main(parser.parse_args()))
