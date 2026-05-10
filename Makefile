@@ -1,4 +1,4 @@
-.PHONY: test lint format typecheck doctor check coverage
+.PHONY: test lint format typecheck doctor check coverage mdlint
 
 test:
 	uv run pytest tests/unit/ tests/integration/ -v --tb=short
@@ -8,6 +8,9 @@ coverage:
 
 lint:
 	uv run ruff check src/ tests/ evals/
+
+mdlint:
+	uv run pymarkdownlnt --config .pymarkdownlnt scan *.md docs/*.md
 
 format:
 	uv run ruff format --check src/ tests/ evals/

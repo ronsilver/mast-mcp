@@ -5,6 +5,7 @@
 Drop-in Python replacement that challenges each reasoning step with local or cloud Ollama models before returning the result to the calling LLM.
 
 Available validation strategies:
+
 - **Adversarial Debate** (modes: `validate`, `debate`): a Critic identifies flaws, a Judge synthesizes a verdict
 - **De Bono Six Thinking Hats** (mode: `debono`): 7 sequential hats refine a working document through facts, creativity, benefits, risks, and intuition into a final verdict
 
@@ -252,7 +253,7 @@ Red hat can be disabled entirely by setting `DEBONO_SKIP_RED=true`.
 
 ## Architecture
 
-```
+```text
 LLM Client → MCP sequentialthinking tool
                     ↓
               MAST Server

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - `mode: debono` — De Bono Six Thinking Hats reasoning strategy
 - `agents/debono.py` — DebonoOrchestrator for 7-hat sequential pipeline
 - `prompts/debono/` — 7 prompt templates (blue_open, white, green, yellow, black, red, blue_close)
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Docs — updated README with debono mode, env vars, architecture
 
 ### Changed
+
 - `config.py` — MastMode extended with `debono`, 8 new config fields
 - `schemas.py` — HatOutput, DebonoResult, debono field on MastOutput
 - `orchestrator.py` — debono branch in run()
@@ -32,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.0] - 2025-03-27
 
 ### Added
+
 - Initial release — drop-in Python replacement for sequential-thinking MCP
 - Modes: `passive`, `validate`, `debate`
 - Critic agent (mistral:7b-instruct) — identifies reasoning flaws
