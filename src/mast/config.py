@@ -19,6 +19,7 @@ class MastConfig(BaseSettings):
         default="http://localhost:11434",
         alias="OLLAMA_BASE_URL",
     )
+    ollama_cloud_api_key: str | None = Field(default=None, alias="OLLAMA_CLOUD_API_KEY")
     critic_model: str = Field(default="mistral:7b-instruct", alias="CRITIC_MODEL")
     judge_model: str = Field(default="deepseek-r1:8b", alias="JUDGE_MODEL")
 

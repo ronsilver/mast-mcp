@@ -74,9 +74,13 @@ class OllamaClient:
     """Async client for Ollama /api/chat endpoint."""
 
     def __init__(self) -> None:
+        headers: dict[str, str] = {}
+        if config.ollama_cloud_api_key:
+            headers["Authorization"] = f"Bearer {config.ollama_cloud_api_key}"
         self._http = httpx.AsyncClient(
             base_url=config.ollama_base_url,
             timeout=config.ollama_timeout,
+            headers=headers,
         )
 
     async def chat(
