@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -15,9 +15,9 @@ jobs:
         with:
           version: "latest"
       - run: uv sync --extra dev
-      - run: uv run ruff check src/ tests/ evals/
-      - run: uv run ruff format --check src/ tests/ evals/
-      - run: uv run mypy src/ tests/
+      - run: make lint
+      - run: make format
+      - run: make typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -27,4 +27,4 @@ jobs:
         with:
           version: "latest"
       - run: uv sync --extra dev
-      - run: uv run pytest tests/unit/ tests/integration/ -v --tb=short
+      - run: make test

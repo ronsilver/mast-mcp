@@ -155,7 +155,7 @@ async def test_ollama_invalid_json_fallback(
 async def test_ollama_cloud_auth_header() -> None:
     """When OLLAMA_CLOUD_API_KEY is set, Authorization header is sent."""
     saved = config.ollama_cloud_api_key
-    config.ollama_cloud_api_key = "sk-test-key-for-auth"  # type: ignore[assignment]
+    config.ollama_cloud_api_key = "sk-test-key-for-auth"
 
     from mast.agents.base import OllamaClient as CloudClient
 

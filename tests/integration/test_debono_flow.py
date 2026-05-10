@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 
 import httpx
 import pytest
@@ -14,7 +15,6 @@ from mast.agents.debono import DebonoOrchestrator
 from mast.validation.orchestrator import ValidationOrchestrator
 from mast.validation.schemas import Verdict
 
-# Mock responses for each hat in sequence
 MOCK_HAT_RESPONSES = {
     "blue_open": {
         "working_document": "## Objective\nFind optimal solution for X.\n## Constraints\nMust be fast.",  # noqa: E501
@@ -85,7 +85,7 @@ HAT_NAMES_NO_RED = ["blue_open", "white", "green", "yellow", "black", "blue_clos
 
 
 @pytest.fixture
-def mock_ollama() -> respx.MockRouter:
+def mock_ollama() -> Generator[respx.MockRouter, None, None]:
     with respx.mock(base_url="http://localhost:11434") as mock:
         yield mock
 
@@ -234,7 +234,7 @@ async def test_debono_full_pipeline_through_orchestrator(mock_ollama: respx.Mock
     assert "debono" in result_dict
     assert result_dict["verdict"] == "accept"
 
-    await orchestrator.aclose()  # type: ignore[union-attr]
+    await orchestrator.aclose()
 
 
 @pytest.mark.asyncio
@@ -266,4 +266,4 @@ async def test_debono_skip_validation_on_short_thought(mock_ollama: respx.MockRo
     assert result.debono is None
     assert result.verdict is None
 
-    await orchestrator.aclose()  # type: ignore[union-attr]
+    await orchestrator.aclose()

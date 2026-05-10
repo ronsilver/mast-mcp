@@ -74,16 +74,6 @@ DEBONO_WHITE_MODEL=qwen2.5:3b-cloud mast-server
 
 The local Ollama instance proxies to cloud transparently.
 
-### Plans and concurrency limits
-
-| Plan | Price | Concurrent models |
-|---|---|---|
-| Free | $0 | 1 |
-| Pro | $20/mo | 3 |
-| Max | $100/mo | 10 |
-
-Requests beyond concurrency are queued. See [ollama.com/pricing](https://ollama.com/pricing).
-
 ### Cloud configuration examples
 
 **Debate mode:**
@@ -260,12 +250,15 @@ source .venv/bin/activate
 uv sync --extra dev
 
 # Run all tests
-pytest tests/unit/ tests/integration/ -v
+make test
 
 # Lint and type check
-ruff check src/ tests/ evals/
-ruff format --check src/ tests/ evals/
-mypy src/
+make lint
+make format
+make typecheck
+
+# Full check (lint + format + type + test)
+make check
 ```
 
 ## Changelog
