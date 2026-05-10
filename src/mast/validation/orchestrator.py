@@ -77,6 +77,72 @@ class ValidationOrchestrator:
             ttl_seconds=config.mast_cache_ttl_s
         )
 
+    async def _run_debono(
+        self,
+        thought: ThoughtData,
+        history_summary: str,
+        critic_model: str | None,
+        judge_model: str | None,
+    ) -> None:
+        if self._debono is None:
+            self._debono = DebonoOrchestrator(self._client)
+        debono_result, blue_close = await self._debono.run(
+            thought=thought.thought,
+            ctx=DebonoContext(
+                thought_number=thought.thought_number,
+                total_thoughts=thought.total_thoughts,
+                history_summary=history_summary,
+                is_revision=thought.is_revision,
+                revises_thought=thought.revises_thought,
+                branch_id=thought.branch_id,
+                branch_from=thought.branch_from_thought,
+            ),
+            primary_model=critic_model,
+            creative_model=judge_model,
+        )
+        self._debono_result = debono_result
+        self._debono_blue_close = blue_close
+
+    async def _run_critic(
+        self,
+        thought: ThoughtData,
+        history_summary: str,
+        effective_critic: str,
+    ) -> None:
+        critic_response, critic_latency = await self._critic.critique(
+            thought=thought.thought,
+            thought_number=thought.thought_number,
+            total_thoughts=thought.total_thoughts,
+            history_summary=history_summary,
+            is_revision=thought.is_revision,
+            revises_thought=thought.revises_thought,
+            branch_id=thought.branch_id,
+            branch_from=thought.branch_from_thought,
+            model=effective_critic,
+        )
+        self._critic_response = critic_response
+        self._critic_latency = critic_latency
+
+    async def _run_judge(
+        self,
+        thought: ThoughtData,
+        history_summary: str,
+        mode: str,
+        effective_judge: str,
+    ) -> None:
+        judge_response, judge_latency = await self._judge.judge(
+            thought=thought.thought,
+            thought_number=thought.thought_number,
+            total_thoughts=thought.total_thoughts,
+            history_summary=history_summary,
+            critique=self._critic_response,
+            mode=mode,
+            is_revision=thought.is_revision,
+            model=effective_judge,
+        )
+        self._judge_response = judge_response
+        self._judge_latency = judge_latency
+
     async def run(
         self,
         thought: ThoughtData,
@@ -125,24 +191,12 @@ class ValidationOrchestrator:
             log.info("validation_cache_hit", trace_id=trace_id)
             return cached
 
-        # --- De Bono mode (full pipeline, no Critic/Judge) ---
+        # --- De Bono mode ---
         if mode == "debono":
-            if self._debono is None:
-                self._debono = DebonoOrchestrator(self._client)
-            debono_result, blue_close = await self._debono.run(
-                thought=thought.thought,
-                ctx=DebonoContext(
-                    thought_number=thought.thought_number,
-                    total_thoughts=thought.total_thoughts,
-                    history_summary=history_summary,
-                    is_revision=thought.is_revision,
-                    revises_thought=thought.revises_thought,
-                    branch_id=thought.branch_id,
-                    branch_from=thought.branch_from_thought,
-                ),
-                primary_model=critic_model,
-                creative_model=judge_model,
-            )
+            await self._run_debono(thought, history_summary, critic_model, judge_model)
+            debono_result = self._debono_result
+            blue_close = self._debono_blue_close
+
             base.debono = debono_result
             verdict_raw = blue_close.get("verdict", "accept")
             try:
@@ -166,17 +220,9 @@ class ValidationOrchestrator:
             return base
 
         # --- Critic ---
-        critic_response, critic_latency = await self._critic.critique(
-            thought=thought.thought,
-            thought_number=thought.thought_number,
-            total_thoughts=thought.total_thoughts,
-            history_summary=history_summary,
-            is_revision=thought.is_revision,
-            revises_thought=thought.revises_thought,
-            branch_id=thought.branch_id,
-            branch_from=thought.branch_from_thought,
-            model=effective_critic,
-        )
+        await self._run_critic(thought, history_summary, effective_critic)
+        critic_response = self._critic_response
+        critic_latency = self._critic_latency
 
         log.info(
             "critic_done",
@@ -200,16 +246,9 @@ class ValidationOrchestrator:
             return base
 
         # --- Judge ---
-        judge_response, judge_latency = await self._judge.judge(
-            thought=thought.thought,
-            thought_number=thought.thought_number,
-            total_thoughts=thought.total_thoughts,
-            history_summary=history_summary,
-            critique=critic_response,
-            mode=mode,
-            is_revision=thought.is_revision,
-            model=effective_judge,
-        )
+        await self._run_judge(thought, history_summary, mode, effective_judge)
+        judge_response = self._judge_response
+        judge_latency = self._judge_latency
 
         log.info(
             "judge_done",
