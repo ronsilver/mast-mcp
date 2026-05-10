@@ -5,4 +5,4 @@ engines:
       - "tests/**"
 
 exclude_paths:
-  - "uv.lock"
+  - "src/mast/prompts/*/*.md"
