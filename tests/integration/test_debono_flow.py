@@ -141,7 +141,7 @@ async def test_debono_orchestrator_with_skip_red(mock_ollama: respx.MockRouter) 
 
     client = OllamaClient()
     orchestrator = DebonoOrchestrator(client)
-    result, blue_close = await orchestrator.run(
+    result, _ = await orchestrator.run(
         thought="Implement feature X.",
         thought_number=1,
         total_thoughts=3,

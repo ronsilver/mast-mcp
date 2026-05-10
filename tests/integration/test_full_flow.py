@@ -157,9 +157,7 @@ async def test_ollama_cloud_auth_header() -> None:
     saved = config.ollama_cloud_api_key
     config.ollama_cloud_api_key = "sk-test-key-for-auth"
 
-    from mast.agents.base import OllamaClient as CloudClient
-
-    client = CloudClient()
+    client = OllamaClient()
 
     try:
         with respx.mock(base_url="http://localhost:11434") as mock:
