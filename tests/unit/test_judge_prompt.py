@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import re
 
+from mast.agents._utils import load_prompt as _load_prompt
 from mast.agents.base import OllamaClient
-from mast.agents.judge import JudgeAgent, _load_prompt
+from mast.agents.judge import JudgeAgent
 from mast.validation.schemas import CriticIssue, CriticResponse, IssueSeverity, IssueType
 
 
@@ -28,7 +29,7 @@ def _sample_critique() -> CriticResponse:
 
 
 def test_prompt_loads_without_frontmatter() -> None:
-    text = _load_prompt("judge.md")
+    text = _load_prompt("mast.prompts.debate", "judge.md")
     assert not text.startswith("---"), "Frontmatter was not stripped"
     assert "version:" not in text[:50]
 

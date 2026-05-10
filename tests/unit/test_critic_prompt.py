@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import re
 
+from mast.agents._utils import load_prompt as _load_prompt
 from mast.agents.base import OllamaClient
-from mast.agents.critic import CriticAgent, _load_prompt
+from mast.agents.critic import CriticAgent
 
 
 def _make_agent() -> CriticAgent:
@@ -14,7 +15,7 @@ def _make_agent() -> CriticAgent:
 
 def test_prompt_loads_without_frontmatter() -> None:
     """Loaded prompt must not contain YAML frontmatter."""
-    text = _load_prompt("critic.md")
+    text = _load_prompt("mast.prompts.debate", "critic.md")
     assert not text.startswith("---"), "Frontmatter was not stripped"
     assert "version:" not in text[:50]
 

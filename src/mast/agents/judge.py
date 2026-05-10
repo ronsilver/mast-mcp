@@ -2,37 +2,25 @@
 
 from __future__ import annotations
 
-import importlib.resources
 import json
-import re
 
 import jinja2
 import structlog
 from pydantic import ValidationError
 
+from mast.agents._utils import load_prompt
 from mast.agents.base import _JUDGE_FALLBACK, OllamaClient
 from mast.config import config
 from mast.validation.schemas import CriticResponse, JudgeResponse, Verdict
 
 log = structlog.get_logger(__name__)
 
-_FRONTMATTER_RE = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
-
-
-def _load_prompt(filename: str) -> str:
-    text = (
-        importlib.resources.files("mast.prompts.debate")
-        .joinpath(filename)
-        .read_text(encoding="utf-8")
-    )
-    return _FRONTMATTER_RE.sub("", text, count=1)
-
 
 class JudgeAgent:
     def __init__(self, client: OllamaClient) -> None:
         self._client = client
         self._template = jinja2.Template(
-            _load_prompt("judge.md"),
+            load_prompt("mast.prompts.debate", "judge.md"),
             undefined=jinja2.Undefined,
         )
 

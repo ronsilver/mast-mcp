@@ -7,7 +7,7 @@ import re
 import jinja2
 import pytest
 
-from mast.agents.debono import _load_prompt
+from mast.agents._utils import load_prompt as _load_prompt
 
 PROMPT_FILES = [
     "blue_open.md",
@@ -48,14 +48,14 @@ ALL_PROMT_VARS = {
 
 @pytest.mark.parametrize("filename", PROMPT_FILES)
 def test_prompt_loads_without_frontmatter(filename: str) -> None:
-    text = _load_prompt(filename)
+    text = _load_prompt("mast.prompts.debono", filename)
     assert not text.startswith("---"), "Frontmatter was not stripped"
     assert len(text) > 100
 
 
 @pytest.mark.parametrize("filename", PROMPT_FILES)
 def test_prompt_renders_basic(filename: str) -> None:
-    text = _load_prompt(filename)
+    text = _load_prompt("mast.prompts.debono", filename)
     tpl = jinja2.Template(text, undefined=jinja2.Undefined)
     rendered = tpl.render(**BASE_VARS)
     assert "Test thought for evaluation" in rendered
@@ -63,7 +63,7 @@ def test_prompt_renders_basic(filename: str) -> None:
 
 @pytest.mark.parametrize("filename", PROMPT_FILES)
 def test_no_unrendered_variables(filename: str) -> None:
-    text = _load_prompt(filename)
+    text = _load_prompt("mast.prompts.debono", filename)
     tpl = jinja2.Template(text, undefined=jinja2.Undefined)
     rendered = tpl.render(**BASE_VARS)
     unrendered = re.findall(r"\{\{.*?\}\}", rendered)
@@ -72,7 +72,7 @@ def test_no_unrendered_variables(filename: str) -> None:
 
 @pytest.mark.parametrize("filename", PROMPT_FILES)
 def test_renders_with_empty_history(filename: str) -> None:
-    text = _load_prompt(filename)
+    text = _load_prompt("mast.prompts.debono", filename)
     tpl = jinja2.Template(text, undefined=jinja2.Undefined)
     vars_no_history = dict(BASE_VARS)
     vars_no_history["history_summary"] = ""
@@ -81,12 +81,12 @@ def test_renders_with_empty_history(filename: str) -> None:
 
 
 def test_blue_close_requires_hat_contributions() -> None:
-    text = _load_prompt("blue_close.md")
+    text = _load_prompt("mast.prompts.debono", "blue_close.md")
     assert "hat_contributions" in text
 
 
 def test_revision_context_shown() -> None:
-    text = _load_prompt("blue_open.md")
+    text = _load_prompt("mast.prompts.debono", "blue_open.md")
     tpl = jinja2.Template(text, undefined=jinja2.Undefined)
     vars_revision = dict(BASE_VARS)
     vars_revision["is_revision"] = True
@@ -98,11 +98,11 @@ def test_revision_context_shown() -> None:
 def test_working_document_passed_to_all_hats_except_blue_open() -> None:
     hats_with_wd = ["white", "green", "yellow", "black", "red", "blue_close"]
     for hat in hats_with_wd:
-        text = _load_prompt(f"{hat}.md")
+        text = _load_prompt("mast.prompts.debono", f"{hat}.md")
         assert "working_document" in text, f"{hat}.md missing working_document"
 
 
 def test_blue_open_does_not_use_working_document_var() -> None:
-    text = _load_prompt("blue_open.md")
+    text = _load_prompt("mast.prompts.debono", "blue_open.md")
     assert "thought" in text
     assert "{{ working_document }}" not in text

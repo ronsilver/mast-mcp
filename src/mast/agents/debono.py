@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import importlib.resources
-import re
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -11,6 +9,7 @@ from typing import Any
 import jinja2
 import structlog
 
+from mast.agents._utils import load_prompt
 from mast.agents.base import OllamaClient
 from mast.config import config
 from mast.validation.schemas import (
@@ -20,17 +19,6 @@ from mast.validation.schemas import (
 )
 
 log = structlog.get_logger(__name__)
-
-_FRONTMATTER_RE = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
-
-
-def _load_prompt(filename: str) -> str:
-    text = (
-        importlib.resources.files("mast.prompts.debono")
-        .joinpath(filename)
-        .read_text(encoding="utf-8")
-    )
-    return _FRONTMATTER_RE.sub("", text, count=1)
 
 
 _HAT_MODEL_GETTER = {
@@ -102,7 +90,7 @@ class DebonoOrchestrator:
     def _get_template(self, filename: str) -> jinja2.Template:
         if filename not in self._templates:
             self._templates[filename] = jinja2.Template(
-                _load_prompt(filename),
+                load_prompt("mast.prompts.debono", filename),
                 undefined=jinja2.Undefined,
             )
         return self._templates[filename]
