@@ -1,4 +1,3 @@
-<!-- markdownlint-disable -->
 ---
 version: 1.0.0
 agent: debono_yellow

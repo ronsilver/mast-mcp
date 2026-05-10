@@ -57,7 +57,4 @@ testpaths = ["tests"]
 source = ["src/mast"]
 omit = ["tests/*"]
 
-[dependency-groups]
-dev = [
-    "pymarkdownlnt>=0.9.37",
-]
+

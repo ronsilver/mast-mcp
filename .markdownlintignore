@@ -1,0 +1,2 @@
+# Ignore prompt template files (Jinja2 XML, not markdown)
+src/mast/prompts/**
