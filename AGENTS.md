@@ -45,8 +45,8 @@ If any step fails, fix before proceeding.
 - **Code changes:** Agent may implement after confirming scope with user (T0 reversible) or after explicit approval (T2+ irreversible).
 - **Configuration changes:** Before modifying environment variables,
   CI configuration, or project dependencies — confirm with the user.
-- **Deploy/release:** Never push to remote. Output the push command for the user.
-  Only push if the user explicitly confirms they want the agent to do so.
+- **Deploy/release:** Never push to remote unless the user explicitly confirms they want the agent to push.
+- **Deploy/release:** Output the push command as a copy-pasteable command for the user to run.
 
 ---
 
