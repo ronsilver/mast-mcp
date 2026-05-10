@@ -6,6 +6,11 @@ engines:
   remark-lint:
     exclude_paths:
       - "CHANGELOG.md"
+  prospector:
+    exclude_paths:
+      - "src/mast/agents/debono.py"
+      - "src/mast/validation/schemas.py"
 
 exclude_paths:
   - "uv.lock"
+  - "src/mast/prompts/**"
