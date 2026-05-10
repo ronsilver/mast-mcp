@@ -10,6 +10,7 @@ engines:
     exclude_paths:
       - "src/mast/agents/debono.py"
       - "src/mast/validation/schemas.py"
+      - "evals/run_eval.py"
 
 exclude_paths:
   - "uv.lock"
