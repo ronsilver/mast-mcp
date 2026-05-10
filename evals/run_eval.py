@@ -11,6 +11,7 @@ Usage:
 If flags are omitted, reads from env vars CRITIC_MODELS / JUDGE_MODELS
 (comma-separated), then falls back to configured CRITIC_MODEL / JUDGE_MODEL.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -149,9 +150,7 @@ def main() -> None:
     parser.add_argument(
         "--critic-models", default=None, help="Comma-separated list of critic models"
     )
-    parser.add_argument(
-        "--judge-models", default=None, help="Comma-separated list of judge models"
-    )
+    parser.add_argument("--judge-models", default=None, help="Comma-separated list of judge models")
     parser.add_argument("--dataset", default="evals/dataset.jsonl", help="Path to dataset JSONL")
     parser.add_argument("--output", default="evals/results", help="Output directory for results")
     asyncio.run(_main(parser.parse_args()))

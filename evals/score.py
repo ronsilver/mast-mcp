@@ -5,6 +5,7 @@ Usage:
     python evals/score.py evals/results/
     python evals/score.py evals/results/mistral_7b-instruct/deepseek-r1_8b/20250427T123456Z.jsonl
 """
+
 from __future__ import annotations
 
 import json

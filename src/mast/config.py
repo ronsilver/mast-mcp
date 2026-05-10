@@ -47,27 +47,13 @@ class MastConfig(BaseSettings):
     color_thought_logging: bool = Field(default=False, alias="MAST_COLOR_THOUGHTS")
 
     # De Bono Six Hats — one env var per hat
-    debono_blue_open_model: str = Field(
-        default="qwen2.5:3b", alias="DEBONO_BLUE_OPEN_MODEL"
-    )
-    debono_white_model: str = Field(
-        default="qwen2.5:3b", alias="DEBONO_WHITE_MODEL"
-    )
-    debono_green_model: str = Field(
-        default="qwen2.5:1.5b", alias="DEBONO_GREEN_MODEL"
-    )
-    debono_yellow_model: str = Field(
-        default="qwen2.5:3b", alias="DEBONO_YELLOW_MODEL"
-    )
-    debono_black_model: str = Field(
-        default="qwen2.5:3b", alias="DEBONO_BLACK_MODEL"
-    )
-    debono_red_model: str = Field(
-        default="qwen2.5:1.5b", alias="DEBONO_RED_MODEL"
-    )
-    debono_blue_close_model: str = Field(
-        default="qwen2.5:3b", alias="DEBONO_BLUE_CLOSE_MODEL"
-    )
+    debono_blue_open_model: str = Field(default="qwen2.5:3b", alias="DEBONO_BLUE_OPEN_MODEL")
+    debono_white_model: str = Field(default="qwen2.5:3b", alias="DEBONO_WHITE_MODEL")
+    debono_green_model: str = Field(default="qwen2.5:1.5b", alias="DEBONO_GREEN_MODEL")
+    debono_yellow_model: str = Field(default="qwen2.5:3b", alias="DEBONO_YELLOW_MODEL")
+    debono_black_model: str = Field(default="qwen2.5:3b", alias="DEBONO_BLACK_MODEL")
+    debono_red_model: str = Field(default="qwen2.5:1.5b", alias="DEBONO_RED_MODEL")
+    debono_blue_close_model: str = Field(default="qwen2.5:3b", alias="DEBONO_BLUE_CLOSE_MODEL")
     debono_skip_red: bool = Field(default=False, alias="DEBONO_SKIP_RED")
 
     # Logging

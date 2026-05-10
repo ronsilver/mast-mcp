@@ -33,9 +33,16 @@ BASE_VARS = {
 }
 
 ALL_PROMT_VARS = {
-    "thought", "working_document", "thought_number", "total_thoughts",
-    "history_summary", "is_revision", "revises_thought",
-    "branch_id", "branch_from", "hat_contributions",
+    "thought",
+    "working_document",
+    "thought_number",
+    "total_thoughts",
+    "history_summary",
+    "is_revision",
+    "revises_thought",
+    "branch_id",
+    "branch_from",
+    "hat_contributions",
 }
 
 

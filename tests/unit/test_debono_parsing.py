@@ -49,7 +49,10 @@ class TestHatOutput:
     def test_rationale_max_length_enforced(self) -> None:
         with pytest.raises(ValidationError):
             HatOutput(
-                hat=HatName.BLUE_OPEN, model="m", latency_ms=0, rationale="X" * 121,
+                hat=HatName.BLUE_OPEN,
+                model="m",
+                latency_ms=0,
+                rationale="X" * 121,
             )
 
     def test_latency_zero_is_valid(self) -> None:
@@ -66,9 +69,7 @@ class TestHatOutput:
             (HatName.RED, "intuition"),
             (HatName.BLUE_CLOSE, "verdict"),
         ]
-        hats = [
-            HatOutput(hat=h, model="m", latency_ms=100, rationale=r) for h, r in ordered
-        ]
+        hats = [HatOutput(hat=h, model="m", latency_ms=100, rationale=r) for h, r in ordered]
         result = DebonoResult(hats=hats, total_latency_ms=700)
         assert len(result.hats) == 7
         assert [h.hat for h in result.hats] == [h for h, _ in ordered]
@@ -103,8 +104,10 @@ class TestDebonoInMastOutput:
         from mast.validation.schemas import MastOutput
 
         hat = HatOutput(
-            hat=HatName.WHITE, model="qwen2.5:3b",
-            latency_ms=750, rationale="facts",
+            hat=HatName.WHITE,
+            model="qwen2.5:3b",
+            latency_ms=750,
+            rationale="facts",
         )
         result = MastOutput(
             thought_number=2,

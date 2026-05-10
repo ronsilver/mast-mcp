@@ -24,8 +24,10 @@ _FRONTMATTER_RE = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
 
 
 def _load_prompt(filename: str) -> str:
-    text = importlib.resources.files("mast.prompts.debono").joinpath(filename).read_text(
-        encoding="utf-8"
+    text = (
+        importlib.resources.files("mast.prompts.debono")
+        .joinpath(filename)
+        .read_text(encoding="utf-8")
     )
     return _FRONTMATTER_RE.sub("", text, count=1)
 
@@ -161,12 +163,14 @@ class DebonoOrchestrator:
             doc_before = working_doc
             working_doc = raw.get("modified_document", raw.get("working_document", doc_before))
 
-            hats_output.append(HatOutput(
-                hat=hat_name,
-                model=model,
-                latency_ms=latency_ms,
-                rationale=raw.get("rationale", ""),
-            ))
+            hats_output.append(
+                HatOutput(
+                    hat=hat_name,
+                    model=model,
+                    latency_ms=latency_ms,
+                    rationale=raw.get("rationale", ""),
+                )
+            )
 
             log.info(
                 "debono_hat_done",
