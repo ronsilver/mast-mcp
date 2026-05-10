@@ -9,7 +9,7 @@ import structlog
 from mast._upstream import ThoughtData
 from mast.agents.base import OllamaClient
 from mast.agents.critic import CriticAgent
-from mast.agents.debono import DebonoOrchestrator
+from mast.agents.debono import DebonoContext, DebonoOrchestrator
 from mast.agents.judge import JudgeAgent
 from mast.config import config
 from mast.validation.cache import ValidationCache
@@ -134,10 +134,12 @@ class ValidationOrchestrator:
                 thought_number=thought.thought_number,
                 total_thoughts=thought.total_thoughts,
                 history_summary=history_summary,
-                is_revision=thought.is_revision,
-                revises_thought=thought.revises_thought,
-                branch_id=thought.branch_id,
-                branch_from=thought.branch_from_thought,
+                ctx=DebonoContext(
+                    is_revision=thought.is_revision,
+                    revises_thought=thought.revises_thought,
+                    branch_id=thought.branch_id,
+                    branch_from=thought.branch_from_thought,
+                ),
                 primary_model=critic_model,
                 creative_model=judge_model,
             )
