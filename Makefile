@@ -10,7 +10,7 @@ lint:
 	uv run ruff check src/ tests/ evals/
 
 mdlint:
-	uv run pymarkdownlnt --config .pymarkdownlnt scan *.md docs/*.md
+	uv run pymarkdownlnt -d MD013,MD024,MD041,MD033 scan *.md docs/*.md
 
 format:
 	uv run ruff format --check src/ tests/ evals/
