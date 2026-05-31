@@ -7,16 +7,22 @@ import hashlib
 import structlog
 
 from mast._upstream import ThoughtData
+from mast.agents.actor_critic import ActorCriticOrchestrator
 from mast.agents.base import OllamaClient
+from mast.agents.brainstorm import BrainstormOrchestrator
 from mast.agents.critic import CriticAgent
 from mast.agents.debono import DebonoContext, DebonoOrchestrator
 from mast.agents.judge import JudgeAgent
+from mast.agents.kalman import KalmanConvergenceLayer
+from mast.agents.tot import TreeOfThoughtsOrchestrator
 from mast.config import config
 from mast.validation.cache import ValidationCache
 from mast.validation.schemas import (
     MastOutput,
     ValidationResult,
     Verdict,
+    WorkflowResult,
+    WorkflowStageResult,
 )
 
 log = structlog.get_logger(__name__)
@@ -66,13 +72,17 @@ def _cache_key(
 
 
 class ValidationOrchestrator:
-    """Coordinates Critic and Judge according to the active mode."""
+    """Coordinates Critic, Judge, and new reasoning modes."""
 
     def __init__(self) -> None:
         self._client = OllamaClient()
         self._critic = CriticAgent(self._client)
         self._judge = JudgeAgent(self._client)
         self._debono: DebonoOrchestrator | None = None
+        self._actor_critic = ActorCriticOrchestrator(self._client)
+        self._brainstorm = BrainstormOrchestrator(self._client)
+        self._tot = TreeOfThoughtsOrchestrator(self._client)
+        self._kalman = KalmanConvergenceLayer(self._client)
         self._cache: ValidationCache[MastOutput] = ValidationCache(
             ttl_seconds=config.mast_cache_ttl_s
         )
@@ -219,7 +229,128 @@ class ValidationOrchestrator:
             self._cache.set(cache_key, base)
             return base
 
-        # --- Critic ---
+        # --- Actor-Critic (self-contained loop, no external critic needed) ---
+        if mode == "actor_critic":
+            ac_result = await self._actor_critic.run(
+                thought=thought.thought,
+                thought_number=thought.thought_number,
+                total_thoughts=thought.total_thoughts,
+                history_summary=history_summary,
+                critic_model=critic_model,
+                judge_model=judge_model,
+            )
+            base.actor_critic = ac_result
+            base.verdict = Verdict.ACCEPT if ac_result.converged else Verdict.REVISE
+            base.confidence = 1.0 if ac_result.converged else 0.5
+            base.suggested_revision = ac_result.final_thought
+
+            log.info(
+                "actor_critic_done",
+                trace_id=trace_id,
+                thought_number=thought.thought_number,
+                total_rounds=ac_result.total_rounds,
+                converged=ac_result.converged,
+            )
+            self._cache.set(cache_key, base)
+            return base
+
+        # --- Brainstorm ---
+        if mode == "brainstorm":
+            bs_result = await self._brainstorm.run(
+                thought=thought.thought,
+                thought_number=thought.thought_number,
+                total_thoughts=thought.total_thoughts,
+                history_summary=history_summary,
+            )
+            base.brainstorm = bs_result
+            base.verdict = Verdict.REVISE
+            base.suggested_revision = bs_result.synthesis
+
+            log.info(
+                "brainstorm_done",
+                trace_id=trace_id,
+                thought_number=thought.thought_number,
+                ideas=len(bs_result.ideas),
+            )
+            self._cache.set(cache_key, base)
+            return base
+
+        # --- Tree of Thoughts ---
+        if mode == "tot":
+            tot_result = await self._tot.run(
+                thought=thought.thought,
+                thought_number=thought.thought_number,
+                total_thoughts=thought.total_thoughts,
+                history_summary=history_summary,
+            )
+            base.tot = tot_result
+            if tot_result.selected_branch:
+                base.verdict = Verdict.REVISE
+                base.suggested_revision = tot_result.selected_branch.next_step
+
+            log.info(
+                "tot_done",
+                trace_id=trace_id,
+                thought_number=thought.thought_number,
+                branches=len(tot_result.branches),
+                selected=tot_result.selected_branch is not None,
+            )
+            self._cache.set(cache_key, base)
+            return base
+
+        # --- Kalman Convergence ---
+        if mode == "kalman":
+            k_result = await self._kalman.run(
+                thought=thought.thought,
+                thought_number=thought.thought_number,
+                total_thoughts=thought.total_thoughts,
+                history_summary=history_summary,
+            )
+            base.kalman = k_result
+            base.verdict = k_result.verdict
+            base.confidence = k_result.confidence
+
+            log.info(
+                "kalman_done",
+                trace_id=trace_id,
+                thought_number=thought.thought_number,
+                x=round(k_result.x_final, 3),
+                converged=k_result.converged,
+                verdict=k_result.verdict.value,
+            )
+            self._cache.set(cache_key, base)
+            return base
+
+        # --- Workflow (chains multiple modes in sequence) ---
+        if mode == "workflow":
+            stages = config.workflow_stages
+            workflow_result = await self._run_workflow(
+                thought,
+                history,
+                upstream_response,
+                stages,
+                trace_id,
+                critic_model=critic_model,
+                judge_model=judge_model,
+            )
+            base.workflow = workflow_result
+            if workflow_result.stages:
+                last = workflow_result.stages[-1]
+                base.verdict = last.verdict
+                base.confidence = last.confidence
+                base.suggested_revision = last.suggested_revision
+
+            log.info(
+                "workflow_done",
+                trace_id=trace_id,
+                thought_number=thought.thought_number,
+                stages=len(workflow_result.stages),
+                final_verdict=last.verdict.value if workflow_result.stages else None,
+            )
+            self._cache.set(cache_key, base)
+            return base
+
+        # --- Critic (runs for validate and debate) ---
         await self._run_critic(thought, history_summary, effective_critic)
         critic_response = self._critic_response
         critic_latency = self._critic_latency
@@ -268,6 +399,98 @@ class ValidationOrchestrator:
 
         self._cache.set(cache_key, base)
         return base
+
+    async def _run_workflow(
+        self,
+        thought: ThoughtData,
+        history: list[ThoughtData],
+        upstream_response: dict[str, object],
+        stages: list[str],
+        trace_id: str,
+        *,
+        critic_model: str | None = None,
+        judge_model: str | None = None,
+    ) -> WorkflowResult:
+        current_thought = thought.thought
+        stage_results: list[WorkflowStageResult] = []
+
+        for stage_mode in stages:
+            log.info("workflow_stage_start", stage=stage_mode, trace_id=trace_id)
+
+            stage_thought = ThoughtData(
+                thought=current_thought,
+                thought_number=thought.thought_number,
+                total_thoughts=thought.total_thoughts,
+                next_thought_needed=thought.next_thought_needed,
+            )
+
+            try:
+                stage_output = await self.run(
+                    thought=stage_thought,
+                    history=history,
+                    upstream_response=upstream_response,
+                    mode=stage_mode,
+                    trace_id=f"{trace_id}:{stage_mode}",
+                    critic_model=critic_model,
+                    judge_model=judge_model,
+                )
+            except Exception as exc:
+                log.error("workflow_stage_failed", stage=stage_mode, error=str(exc))
+                stage_results.append(
+                    WorkflowStageResult.model_validate(
+                        {
+                            "stage": stage_mode,
+                            "verdict": "accept",
+                            "confidence": 0.0,
+                            "error": str(exc),
+                            "inputThought": current_thought,
+                            "outputThought": current_thought,
+                        }
+                    )
+                )
+                continue
+
+            output_thought = (
+                stage_output.suggested_revision
+                or (stage_output.actor_critic.final_thought if stage_output.actor_critic else None)
+                or (stage_output.brainstorm.synthesis if stage_output.brainstorm else None)
+                or (
+                    stage_output.tot.selected_branch.next_step
+                    if stage_output.tot and stage_output.tot.selected_branch
+                    else None
+                )
+                or current_thought
+            )
+
+            stage_results.append(
+                WorkflowStageResult.model_validate(
+                    {
+                        "stage": stage_mode,
+                        "verdict": stage_output.verdict.value if stage_output.verdict else "accept",
+                        "confidence": stage_output.confidence or 0.0,
+                        "suggestedRevision": stage_output.suggested_revision,
+                        "inputThought": current_thought,
+                        "outputThought": output_thought,
+                    }
+                )
+            )
+
+            current_thought = output_thought
+
+            log.info(
+                "workflow_stage_done",
+                stage=stage_mode,
+                verdict=stage_results[-1].verdict,
+                trace_id=trace_id,
+            )
+
+        return WorkflowResult.model_validate(
+            {
+                "stages": stage_results,
+                "finalThought": current_thought,
+                "totalStages": len(stages),
+            }
+        )
 
     async def aclose(self) -> None:
         await self._client.aclose()

@@ -8,16 +8,17 @@ from typing import Any
 from mast._upstream_tool import SEQUENTIAL_THINKING_INPUT_SCHEMA
 
 MAST_DEBATE_TOOL_DESCRIPTION = """\
-Forces debate mode (Critic + Judge) or debono mode (Six Thinking Hats) regardless of
-server defaults. Use for maximum validation quality on critical reasoning steps.
+Forces a specific reasoning strategy (Critic+Judge debate, De Bono Six Hats, Actor-Critic,
+Brainstorm, Tree of Thoughts, Kalman Convergence, or Workflow) regardless of server defaults.
+Use for maximum validation quality on critical reasoning steps.
 
-In debate mode: the thought is evaluated by two local Ollama models: a Critic identifies
-flaws, and a Judge synthesizes a final verdict (accept / revise / reject) with optional
-suggested revision.
-
-In debono mode: the thought passes through 7 sequential De Bono hats (Blue Open, White,
-Green, Yellow, Black, Red, Blue Close) that progressively refine a working document and
-produce a verdict.
+In debate mode: thought evaluated by Critic (identifies flaws) and Judge (verdict + revision).
+In debono mode: 7 sequential De Bono hats refine a working document.
+In actor_critic mode: iterative Critic+Judge loop up to ACTOR_CRITIC_MAX_ROUNDS.
+In brainstorm mode: N parallel generators produce ideas, Synthesizer merges top picks.
+In tot mode (Tree of Thoughts): N parallel branch generators, Voter scores them.
+In kalman mode: N scorers evaluate quality, Kalman filter fuses scores optimally.
+In workflow mode: chains multiple modes in sequence defined by MAST_WORKFLOW_STAGES.
 
 Accepts optional model overrides per call.
 All other parameters are identical to the sequentialthinking tool.\
