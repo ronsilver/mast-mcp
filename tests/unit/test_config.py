@@ -20,7 +20,18 @@ def test_invalid_mast_mode_raises() -> None:
 
 
 def test_valid_mast_modes() -> None:
-    for mode in ("passive", "validate", "debate"):
+    modes = (
+        "passive",
+        "validate",
+        "debate",
+        "debono",
+        "actor_critic",
+        "brainstorm",
+        "tot",
+        "kalman",
+        "workflow",
+    )
+    for mode in modes:
         cfg = MastConfig(**{"MAST_MODE": mode})  # type: ignore[arg-type]
         assert cfg.mast_mode == mode
 

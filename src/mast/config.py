@@ -7,7 +7,17 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
-MastMode = Literal["passive", "validate", "debate", "debono"]
+MastMode = Literal[
+    "passive",
+    "validate",
+    "debate",
+    "debono",
+    "actor_critic",
+    "brainstorm",
+    "tot",
+    "kalman",
+    "workflow",
+]
 FormatMode = Literal["schema", "json", "text"]
 
 
@@ -60,6 +70,33 @@ class MastConfig(BaseSettings):
     # Logging
     mast_log_level: str = Field(default="INFO", alias="MAST_LOG_LEVEL")
 
+    # Actor-Critic
+    actor_critic_max_rounds: int = Field(default=3, alias="ACTOR_CRITIC_MAX_ROUNDS")
+
+    # Brainstorm
+    brainstorm_models_str: str = Field(default="llama3:8b,mistral:7b", alias="BRAINSTORM_MODELS")
+    brainstorm_synth_model: str = Field(default="qwen2.5:14b", alias="BRAINSTORM_SYNTH_MODEL")
+
+    # Tree of Thoughts
+    tot_branch_models_str: str = Field(
+        default="llama3:8b,mistral:7b,qwen2.5:7b", alias="TOT_BRANCH_MODELS"
+    )
+    tot_voter_model: str = Field(default="deepseek-r1:8b", alias="TOT_VOTER_MODEL")
+
+    # Kalman Convergence
+    kalman_scorer_models_str: str = Field(
+        default="mistral:7b,qwen2.5:7b,phi3:mini", alias="KALMAN_SCORER_MODELS"
+    )
+    kalman_p_threshold: float = Field(default=0.05, alias="KALMAN_P_THRESHOLD")
+    kalman_accept_threshold: float = Field(default=0.70, alias="KALMAN_ACCEPT_THRESHOLD")
+
+    # Workflow
+    workflow_stages_str: str = Field(
+        default="debate,kalman",
+        alias="MAST_WORKFLOW_STAGES",
+        description="Comma-separated modes to chain in workflow mode.",
+    )
+
     @field_validator("mast_format_mode", mode="before")
     @classmethod
     def validate_format_mode(cls, v: str) -> str:
@@ -71,7 +108,17 @@ class MastConfig(BaseSettings):
     @field_validator("mast_mode", mode="before")
     @classmethod
     def validate_mode(cls, v: str) -> str:
-        allowed = {"passive", "validate", "debate", "debono"}
+        allowed = {
+            "passive",
+            "validate",
+            "debate",
+            "debono",
+            "actor_critic",
+            "brainstorm",
+            "tot",
+            "kalman",
+            "workflow",
+        }
         if v not in allowed:
             raise ValueError(f"MAST_MODE must be one of {allowed}, got {v!r}")
         return v
@@ -79,6 +126,22 @@ class MastConfig(BaseSettings):
     @property
     def ollama_timeout(self) -> float:
         return self.mast_timeout_ms / 1000.0
+
+    @property
+    def brainstorm_models(self) -> list[str]:
+        return [m.strip() for m in self.brainstorm_models_str.split(",") if m.strip()]
+
+    @property
+    def tot_branch_models(self) -> list[str]:
+        return [m.strip() for m in self.tot_branch_models_str.split(",") if m.strip()]
+
+    @property
+    def kalman_scorer_models(self) -> list[str]:
+        return [m.strip() for m in self.kalman_scorer_models_str.split(",") if m.strip()]
+
+    @property
+    def workflow_stages(self) -> list[str]:
+        return [s.strip() for s in self.workflow_stages_str.split(",") if s.strip()]
 
     model_config = {"populate_by_name": True, "env_file": ".env"}
 

@@ -144,16 +144,153 @@ class DebonoResult(BaseModel):
     total_latency_ms: int = 0
 
 
+# ---------------------------------------------------------------------------
+# Actor-Critic schemas
+# ---------------------------------------------------------------------------
+
+
+class ActorCriticRound(BaseModel):
+    round: int
+    thought: str
+    critic: CriticResponse
+    verdict: Verdict
+    suggested_revision: str | None = Field(default=None, alias="suggestedRevision")
+    critic_latency_ms: int = Field(default=0, alias="criticLatencyMs")
+    judge_latency_ms: int = Field(default=0, alias="judgeLatencyMs")
+
+    model_config = {"populate_by_name": True}
+
+
+class ActorCriticResult(BaseModel):
+    rounds: list[ActorCriticRound]
+    total_rounds: int = Field(alias="totalRounds")
+    final_thought: str = Field(alias="finalThought")
+    converged: bool
+
+    model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Brainstorm schemas
+# ---------------------------------------------------------------------------
+
+
+class BrainstormIdea(BaseModel):
+    idea: str = Field(max_length=400)
+    rationale: str = Field(default="", max_length=120)
+    angle: str = Field(default="")
+    model: str = Field(default="")
+    latency_ms: int = Field(default=0, alias="latencyMs")
+
+    model_config = {"populate_by_name": True}
+
+
+class BrainstormResult(BaseModel):
+    ideas: list[BrainstormIdea]
+    synthesis: str
+    top_ideas: list[str] = Field(default_factory=list, alias="topIdeas")
+    synth_latency_ms: int = Field(default=0, alias="synthLatencyMs")
+
+    model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Tree of Thoughts schemas
+# ---------------------------------------------------------------------------
+
+
+class ToTBranch(BaseModel):
+    next_step: str = Field(max_length=600, alias="nextStep")
+    rationale: str = Field(default="", max_length=120)
+    model: str = Field(default="")
+    voter_score: float | None = Field(default=None, alias="voterScore")
+    voter_rationale: str | None = Field(default=None, alias="voterRationale")
+
+    model_config = {"populate_by_name": True}
+
+
+class ToTResult(BaseModel):
+    branches: list[ToTBranch]
+    selected_branch: ToTBranch | None = Field(default=None, alias="selectedBranch")
+    voter_scores: list[dict[str, object]] = Field(default_factory=list, alias="voterScores")
+
+    model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Kalman Convergence schemas
+# ---------------------------------------------------------------------------
+
+
+class KalmanScoreEntry(BaseModel):
+    score: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(ge=0.0, le=1.0)
+    rationale: str = Field(default="", max_length=80)
+    model: str = Field(default="")
+    latency_ms: int = Field(default=0, alias="latencyMs")
+
+    model_config = {"populate_by_name": True}
+
+
+class KalmanResult(BaseModel):
+    scorers: list[KalmanScoreEntry]
+    x_final: float = Field(alias="xFinal")
+    P_final: float = Field(alias="PFinal")
+    converged: bool
+    triggers: list[str]
+    verdict: Verdict
+    confidence: float
+
+    model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# Workflow schemas
+# ---------------------------------------------------------------------------
+
+
+class WorkflowStageResult(BaseModel):
+    stage: str
+    verdict: Verdict
+    confidence: float
+    suggested_revision: str | None = Field(default=None, alias="suggestedRevision")
+    input_thought: str = Field(alias="inputThought")
+    output_thought: str = Field(alias="outputThought")
+    error: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class WorkflowResult(BaseModel):
+    stages: list[WorkflowStageResult]
+    final_thought: str = Field(alias="finalThought")
+    total_stages: int = Field(alias="totalStages")
+
+    model_config = {"populate_by_name": True}
+
+
+# ---------------------------------------------------------------------------
+# MastOutput — extended per-mode top-level output
+# ---------------------------------------------------------------------------
+
+
 class MastOutput(SequentialThinkingOutput):
-    """Extended output for validate/debate/debono modes."""
+    """Extended output for all validation modes."""
 
     validation: ValidationResult | None = None
     verdict: Verdict | None = None
     confidence: float | None = None
-    suggested_revision: str | None = Field(default=None, serialization_alias="suggestedRevision")
-    judge_model: str | None = Field(default=None, serialization_alias="judgeModel")
-    judge_latency_ms: int | None = Field(default=None, serialization_alias="judgeLatencyMs")
+    suggested_revision: str | None = Field(default=None, alias="suggestedRevision")
+    judge_model: str | None = Field(default=None, alias="judgeModel")
+    judge_latency_ms: int | None = Field(default=None, alias="judgeLatencyMs")
     debono: DebonoResult | None = None
+    actor_critic: ActorCriticResult | None = None
+    brainstorm: BrainstormResult | None = None
+    tot: ToTResult | None = None
+    kalman: KalmanResult | None = None
+    workflow: WorkflowResult | None = None
+
+    model_config = {"populate_by_name": True}
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump(by_alias=True, exclude_none=True)
