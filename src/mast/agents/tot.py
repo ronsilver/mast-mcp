@@ -16,7 +16,10 @@ log = structlog.get_logger(__name__)
 
 
 class TreeOfThoughtsOrchestrator:
+    """Parallel branch generation and voting orchestrator."""
+
     def __init__(self, client: OllamaClient) -> None:
+        """Initialize with Ollama client and load prompt templates."""
         self._client = client
         self._branch_tpl = jinja2.Template(
             load_prompt("mast.prompts.tot", "branch_generator.md"),
@@ -104,15 +107,7 @@ class TreeOfThoughtsOrchestrator:
             )
 
         scores = await self._vote(thought, branches, history_summary)
-
-        for i, score_data in enumerate(scores):
-            if i < len(branches):
-                raw_score = score_data.get("score", 0.0)
-                branches[i].voter_score = raw_score if isinstance(raw_score, (int, float)) else 0.0
-                raw_rationale = score_data.get("rationale", "")
-                branches[i].voter_rationale = (
-                    str(raw_rationale) if raw_rationale is not None else ""
-                )
+        self._apply_voter_scores(branches, scores)
 
         branches.sort(key=lambda b: b.voter_score or 0, reverse=True)
         selected = branches[0] if branches else None
@@ -124,3 +119,17 @@ class TreeOfThoughtsOrchestrator:
                 "voterScores": scores,
             }
         )
+
+    @staticmethod
+    def _apply_voter_scores(
+        branches: list[ToTBranch],
+        scores: list[dict[str, object]],
+    ) -> None:
+        for i, score_data in enumerate(scores):
+            if i < len(branches):
+                raw_score = score_data.get("score", 0.0)
+                branches[i].voter_score = raw_score if isinstance(raw_score, int | float) else 0.0
+                raw_rationale = score_data.get("rationale", "")
+                branches[i].voter_rationale = (
+                    str(raw_rationale) if raw_rationale is not None else ""
+                )

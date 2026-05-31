@@ -16,7 +16,10 @@ log = structlog.get_logger(__name__)
 
 
 class BrainstormOrchestrator:
+    """Parallel divergence to synthesis convergence orchestrator."""
+
     def __init__(self, client: OllamaClient) -> None:
+        """Initialize with Ollama client and load prompt templates."""
         self._client = client
         self._idea_tpl = jinja2.Template(
             load_prompt("mast.prompts.brainstorm", "idea_generator.md"),

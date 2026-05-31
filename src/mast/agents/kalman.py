@@ -37,8 +37,28 @@ class _KFState:
         self.P = max(0.0, self.P)
 
 
+def _detect_kalman_triggers(state: _KFState, entry_count: int) -> list[str]:
+    triggers: list[str] = []
+    if state.P > 0.5 and entry_count >= 2:
+        triggers.append("K1:high_divergence")
+    if state.P < 1e-15:
+        triggers.append("K2:covariance_collapse")
+    if any(abs(i) > 0.5 for i in state.innovations):
+        triggers.append("K4:large_innovation")
+    if (
+        len(state.innovations) >= 3
+        and max(state.innovations[-3:]) - min(state.innovations[-3:]) < 0.02
+        and state.P > 0.20
+    ):
+        triggers.append("K5:no_new_information")
+    return triggers
+
+
 class KalmanConvergenceLayer:
+    """Bayesian fusion of multi-agent quality scores via Kalman filter."""
+
     def __init__(self, client: OllamaClient) -> None:
+        """Initialize with Ollama client and load scorer prompt template."""
         self._client = client
         self._scorer_tpl = jinja2.Template(
             load_prompt("mast.prompts.kalman", "scorer.md"),
@@ -80,8 +100,8 @@ class KalmanConvergenceLayer:
         history_summary: str,
     ) -> KalmanResult:
         models = config.kalman_scorer_models
-        p_threshold = config.kalman_p_threshold
         accept_threshold = config.kalman_accept_threshold
+        p_threshold = config.kalman_p_threshold
 
         tasks = [
             self._score_thought(m, thought, history_summary, thought_number, total_thoughts)
@@ -91,8 +111,6 @@ class KalmanConvergenceLayer:
 
         state = _KFState()
         entries: list[KalmanScoreEntry] = []
-        triggers: list[str] = []
-
         for r in results:
             if isinstance(r, BaseException):
                 log.warning("kalman_scorer_failed", error=str(r))
@@ -101,19 +119,7 @@ class KalmanConvergenceLayer:
             entries.append(entry)
             state.update(z=entry.score, confidence=entry.confidence)
 
-        if state.P > 0.5 and len(entries) >= 2:
-            triggers.append("K1:high_divergence")
-        if state.P < 1e-15:
-            triggers.append("K2:covariance_collapse")
-        if any(abs(i) > 0.5 for i in state.innovations):
-            triggers.append("K4:large_innovation")
-        if (
-            len(state.innovations) >= 3
-            and max(state.innovations[-3:]) - min(state.innovations[-3:]) < 0.02
-            and state.P > 0.20
-        ):
-            triggers.append("K5:no_new_information")
-
+        triggers = _detect_kalman_triggers(state, len(entries))
         converged = p_threshold > state.P
         verdict = Verdict.ACCEPT if state.x >= accept_threshold else Verdict.REVISE
 
@@ -125,7 +131,6 @@ class KalmanConvergenceLayer:
             converged=converged,
             triggers=triggers,
         )
-
         return KalmanResult.model_validate(
             {
                 "scorers": entries,

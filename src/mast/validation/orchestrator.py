@@ -415,74 +415,18 @@ class ValidationOrchestrator:
         stage_results: list[WorkflowStageResult] = []
 
         for stage_mode in stages:
-            log.info("workflow_stage_start", stage=stage_mode, trace_id=trace_id)
-
-            stage_thought = ThoughtData(
-                thought=current_thought,
-                thought_number=thought.thought_number,
-                total_thoughts=thought.total_thoughts,
-                next_thought_needed=thought.next_thought_needed,
-            )
-
-            try:
-                stage_output = await self.run(
-                    thought=stage_thought,
-                    history=history,
-                    upstream_response=upstream_response,
-                    mode=stage_mode,
-                    trace_id=f"{trace_id}:{stage_mode}",
-                    critic_model=critic_model,
-                    judge_model=judge_model,
-                )
-            except Exception as exc:
-                log.error("workflow_stage_failed", stage=stage_mode, error=str(exc))
-                stage_results.append(
-                    WorkflowStageResult.model_validate(
-                        {
-                            "stage": stage_mode,
-                            "verdict": "accept",
-                            "confidence": 0.0,
-                            "error": str(exc),
-                            "inputThought": current_thought,
-                            "outputThought": current_thought,
-                        }
-                    )
-                )
-                continue
-
-            output_thought = (
-                stage_output.suggested_revision
-                or (stage_output.actor_critic.final_thought if stage_output.actor_critic else None)
-                or (stage_output.brainstorm.synthesis if stage_output.brainstorm else None)
-                or (
-                    stage_output.tot.selected_branch.next_step
-                    if stage_output.tot and stage_output.tot.selected_branch
-                    else None
-                )
-                or current_thought
-            )
-
-            stage_results.append(
-                WorkflowStageResult.model_validate(
-                    {
-                        "stage": stage_mode,
-                        "verdict": stage_output.verdict.value if stage_output.verdict else "accept",
-                        "confidence": stage_output.confidence or 0.0,
-                        "suggestedRevision": stage_output.suggested_revision,
-                        "inputThought": current_thought,
-                        "outputThought": output_thought,
-                    }
-                )
-            )
-
-            current_thought = output_thought
-
-            log.info(
-                "workflow_stage_done",
-                stage=stage_mode,
-                verdict=stage_results[-1].verdict,
+            result = await self._run_workflow_stage(
+                stage_mode=stage_mode,
+                current_thought=current_thought,
+                thought=thought,
+                history=history,
+                upstream_response=upstream_response,
                 trace_id=trace_id,
+                critic_model=critic_model,
+                judge_model=judge_model,
             )
+            stage_results.append(result)
+            current_thought = result.output_thought
 
         return WorkflowResult.model_validate(
             {
@@ -491,6 +435,84 @@ class ValidationOrchestrator:
                 "totalStages": len(stages),
             }
         )
+
+    async def _run_workflow_stage(
+        self,
+        stage_mode: str,
+        current_thought: str,
+        thought: ThoughtData,
+        history: list[ThoughtData],
+        upstream_response: dict[str, object],
+        trace_id: str,
+        *,
+        critic_model: str | None = None,
+        judge_model: str | None = None,
+    ) -> WorkflowStageResult:
+        log.info("workflow_stage_start", stage=stage_mode, trace_id=trace_id)
+
+        stage_thought = ThoughtData(
+            thought=current_thought,
+            thought_number=thought.thought_number,
+            total_thoughts=thought.total_thoughts,
+            next_thought_needed=thought.next_thought_needed,
+        )
+
+        try:
+            stage_output = await self.run(
+                thought=stage_thought,
+                history=history,
+                upstream_response=upstream_response,
+                mode=stage_mode,
+                trace_id=f"{trace_id}:{stage_mode}",
+                critic_model=critic_model,
+                judge_model=judge_model,
+            )
+        except Exception as exc:
+            log.error("workflow_stage_failed", stage=stage_mode, error=str(exc))
+            return WorkflowStageResult.model_validate(
+                {
+                    "stage": stage_mode,
+                    "verdict": "accept",
+                    "confidence": 0.0,
+                    "error": str(exc),
+                    "inputThought": current_thought,
+                    "outputThought": current_thought,
+                }
+            )
+
+        output_thought = self._extract_workflow_output(stage_output, current_thought)
+
+        log.info(
+            "workflow_stage_done",
+            stage=stage_mode,
+            verdict=stage_output.verdict,
+            trace_id=trace_id,
+        )
+        return WorkflowStageResult.model_validate(
+            {
+                "stage": stage_mode,
+                "verdict": stage_output.verdict.value if stage_output.verdict else "accept",
+                "confidence": stage_output.confidence or 0.0,
+                "suggestedRevision": stage_output.suggested_revision,
+                "inputThought": current_thought,
+                "outputThought": output_thought,
+            }
+        )
+
+    @staticmethod
+    def _extract_workflow_output(
+        stage_output: MastOutput,
+        fallback: str,
+    ) -> str:
+        if stage_output.suggested_revision:
+            return stage_output.suggested_revision
+        if stage_output.actor_critic and stage_output.actor_critic.final_thought:
+            return stage_output.actor_critic.final_thought
+        if stage_output.brainstorm and stage_output.brainstorm.synthesis:
+            return stage_output.brainstorm.synthesis
+        if stage_output.tot and stage_output.tot.selected_branch:
+            return stage_output.tot.selected_branch.next_step
+        return fallback
 
     async def aclose(self) -> None:
         await self._client.aclose()
