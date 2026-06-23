@@ -1,5 +1,7 @@
 # Multi-Agent Sequential Thinking (MAST-MCP) Agent Architecture
 
+> **MAST** = Multi-Agent Sequential Thinking — an active validation layer for LLM reasoning.
+
 ## Project Overview
 
 The **Multi-Agent Sequential Thinking with Ollama** (MAST) server is a drop-in Python
@@ -22,6 +24,7 @@ Two reasoning strategies are implemented:
 - **Tone:** Direct, technical, concise. Verify before asserting. Admit unknowns.
 - **Principles:** Right > easy. Code is source of truth. Never assume — read, run, observe,
   then assert. When in doubt, verify with the user.
+  > **Escape hatch:** If verifying is impossible (no access, no tool), state `INFERRED` explicitly and flag the gap.
 - **Human oversight:** Irreversible actions (delete, deploy, secret rotation) require user confirmation.
 
 ---
@@ -47,6 +50,7 @@ If any step fails, fix before proceeding.
   CI configuration, or project dependencies — confirm with the user.
 - **Deploy/release:** Never push to remote unless the user explicitly confirms they want the agent to push.
 - **Deploy/release:** Output the push command as a copy-pasteable command for the user to run.
+- **Push command:** `git push origin <branch>` — user runs this manually.
 
 ---
 
