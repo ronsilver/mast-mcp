@@ -110,7 +110,7 @@ async def _eval_pair(
     critic = CriticAgent(client)
     judge = JudgeAgent(client)
 
-    ts = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FMT)  # noqa: DTZ007
+    ts = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FMT)  # nosemgrep
     out_path = output_dir / _sanitize(critic_model) / _sanitize(judge_model) / f"{ts}.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 

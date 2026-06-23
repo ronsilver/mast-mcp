@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import json as _json
-import time as _time
 from typing import Any
 
 import httpx
 import structlog
 
-from mast.agents._json_utils import extract_json
 from mast.agents.protocols import ChatBackend, ChatResult
 from mast.config import config
 
@@ -97,44 +94,18 @@ class GeminiBackend(ChatBackend):
         url = self._endpoint(model) + self._query_string()
         payload = self._build_payload(system_prompt, temperature, num_predict, json_schema)
 
-        content = ""
-        last_latency_ms = 0
-        for attempt in range(2):
-            t0 = _time.monotonic()
-            try:
-                response = await self._http.post(url, json=payload)
-                latency_ms = int((_time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                response.raise_for_status()
-                raw = response.json()
-                content = self._extract_text(raw)
-                if not content:
-                    if attempt == 0:
-                        continue
-                    break
-                try:
-                    parsed_dict: dict[str, Any] = _json.loads(content)
-                    return parsed_dict, latency_ms
-                except _json.JSONDecodeError:
-                    extracted = extract_json(content)
-                    if extracted is not None:
-                        return extracted, latency_ms
-                    if attempt == 0:
-                        continue
-            except (KeyError, IndexError) as exc:
-                latency_ms = int((_time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                log.warning("gemini_response_key_missing", error=str(exc), model=model)
-                if attempt == 0:
-                    continue
-            except httpx.HTTPError as exc:
-                latency_ms = int((_time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                log.error("gemini_http_error", error=str(exc), model=model)
-                return fallback, latency_ms
+        from mast.agents._utils import _retry_parse
 
-        log.warning("gemini_validation_failed_using_fallback", model=model)
-        return fallback, last_latency_ms
+        return await _retry_parse(
+            self._http,
+            url,
+            payload,
+            None,
+            self._extract_text,
+            fallback,
+            model,
+            "gemini",
+        )
 
     async def list_models(self) -> list[str]:
         """Fetch available models from the v1beta/models endpoint."""

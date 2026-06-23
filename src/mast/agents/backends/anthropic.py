@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import json as _json
-import time as _time
+import json
 from typing import Any
 
 import httpx
 import structlog
 
-from mast.agents._json_utils import extract_json
 from mast.agents.protocols import ChatBackend, ChatResult
 from mast.config import config
 
@@ -101,52 +99,32 @@ class AnthropicBackend(ChatBackend):
         json_schema: dict[str, Any] | None = None,
     ) -> ChatResult:
         payload = self._build_payload(model, system_prompt, temperature, num_predict, json_schema)
+        from mast.agents._utils import _retry_parse
 
-        content = ""
-        last_latency_ms = 0
-        for attempt in range(2):
-            t0 = _time.monotonic()
-            try:
-                response = await self._http.post(
-                    "/v1/messages", json=payload, headers=self._headers()
-                )
-                latency_ms = int((_time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                response.raise_for_status()
-                raw = response.json()
-                if json_schema is not None:
-                    parsed = self._extract_tool_input(raw)
-                    if parsed is not None:
-                        return parsed, latency_ms
-                text_blocks: list[str] = []
-                for block in raw.get("content", []):
-                    if isinstance(block, dict) and block.get("type") == "text":
-                        text_blocks.append(str(block.get("text", "")))
-                content = "\n".join(text_blocks)
-                if content:
-                    try:
-                        parsed_dict: dict[str, Any] = _json.loads(content)
-                        return parsed_dict, latency_ms
-                    except _json.JSONDecodeError:
-                        extracted = extract_json(content)
-                        if extracted is not None:
-                            return extracted, latency_ms
-                if attempt == 0:
-                    continue
-            except (KeyError, IndexError) as exc:
-                latency_ms = int((_time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                log.warning("anthropic_response_key_missing", error=str(exc), model=model)
-                if attempt == 0:
-                    continue
-            except httpx.HTTPError as exc:
-                latency_ms = int((_time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                log.error("anthropic_http_error", error=str(exc), model=model)
-                return fallback, latency_ms
+        def extractor(raw: dict[str, Any]) -> str:
+            if json_schema is not None:
+                parsed = self._extract_tool_input(raw)
+                if parsed is not None:
+                    return json.dumps(parsed)
+            return self._extract_content(raw)
 
-        log.warning("anthropic_validation_failed_using_fallback", model=model)
-        return fallback, last_latency_ms
+        return await _retry_parse(
+            self._http,
+            "/v1/messages",
+            payload,
+            self._headers(),
+            extractor,
+            fallback,
+            model,
+            "anthropic",
+        )
+
+    def _extract_content(self, raw: dict[str, Any]) -> str:
+        text_blocks: list[str] = []
+        for block in raw.get("content", []):
+            if isinstance(block, dict) and block.get("type") == "text":
+                text_blocks.append(str(block.get("text", "")))
+        return "\n".join(text_blocks)
 
     async def list_models(self) -> list[str]:
         return list(_DEFAULT_MODELS)

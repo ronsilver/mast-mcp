@@ -21,7 +21,6 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
       - run: uv sync --extra dev
       - run: make lint
       - run: make format
@@ -41,7 +40,6 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
-          cache-dependency-glob: "uv.lock"
           python-version: ${{ matrix.python-version }}
       - run: uv sync --extra dev
       - run: make coverage

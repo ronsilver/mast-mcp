@@ -61,6 +61,16 @@ class _WorkflowStageCtx:
     judge_model: str | None = None
 
 
+def _build_base_output(upstream_response: dict[str, object]) -> MastOutput:
+    return MastOutput(
+        thought_number=upstream_response["thoughtNumber"],  # type: ignore[arg-type]
+        total_thoughts=upstream_response["totalThoughts"],  # type: ignore[arg-type]
+        next_thought_needed=upstream_response["nextThoughtNeeded"],  # type: ignore[arg-type]
+        branches=upstream_response.get("branches", []),  # type: ignore[arg-type]
+        thought_history_length=upstream_response["thoughtHistoryLength"],  # type: ignore[arg-type]
+    )
+
+
 def _build_history_summary(
     history: list[ThoughtData],
     window: int,
@@ -190,6 +200,56 @@ class ValidationOrchestrator:
             )
         )
 
+    def _prepare_ctx(
+        self,
+        thought: ThoughtData,
+        history: list[ThoughtData],
+        upstream_response: dict[str, object],
+        mode: str,
+        trace_id: str,
+        critic_model: str | None,
+        judge_model: str | None,
+    ) -> tuple[_RunCtx, MastOutput]:
+        """Build base output and _RunCtx, return cache key for lookup."""
+        effective_critic = critic_model or config.critic_model
+        effective_judge = judge_model or config.judge_model
+        base = MastOutput(
+            thought_number=upstream_response["thoughtNumber"],  # type: ignore[arg-type]
+            total_thoughts=upstream_response["totalThoughts"],  # type: ignore[arg-type]
+            next_thought_needed=upstream_response["nextThoughtNeeded"],  # type: ignore[arg-type]
+            branches=upstream_response.get("branches", []),  # type: ignore[arg-type]
+            thought_history_length=upstream_response["thoughtHistoryLength"],  # type: ignore[arg-type]
+        )
+        history_summary = _build_history_summary(
+            history,
+            window=config.mast_history_window,
+            max_tokens=config.mast_history_max_tokens,
+        )
+        cache_key = _cache_key(
+            thought.thought,
+            effective_critic,
+            effective_judge,
+            mode,
+            history_summary,
+            thought.branch_id,
+        )
+        ctx = _RunCtx(
+            mode=mode,
+            thought=thought,
+            history=history,
+            history_summary=history_summary,
+            upstream_response=upstream_response,
+            trace_id=trace_id,
+            base=base,
+            cache_key=cache_key,
+            bypass_cache=mode in ("brainstorm", "tot"),
+            effective_critic=effective_critic,
+            effective_judge=effective_judge,
+            critic_model=critic_model,
+            judge_model=judge_model,
+        )
+        return ctx, base
+
     async def run(
         self,
         thought: ThoughtData,
@@ -201,63 +261,21 @@ class ValidationOrchestrator:
         critic_model: str | None = None,
         judge_model: str | None = None,
     ) -> MastOutput:
-        effective_critic = critic_model or config.critic_model
-        effective_judge = judge_model or config.judge_model
-
-        base = MastOutput(
-            thought_number=upstream_response["thoughtNumber"],  # type: ignore[arg-type]
-            total_thoughts=upstream_response["totalThoughts"],  # type: ignore[arg-type]
-            next_thought_needed=upstream_response["nextThoughtNeeded"],  # type: ignore[arg-type]
-            branches=upstream_response.get("branches", []),  # type: ignore[arg-type]
-            thought_history_length=upstream_response["thoughtHistoryLength"],  # type: ignore[arg-type]
-        )
-
-        if mode == "passive":
-            return base
-
-        if len(thought.thought.strip()) < config.mast_skip_threshold_chars:
+        base = _build_base_output(upstream_response)
+        if mode == "passive" or len(thought.thought.strip()) < config.mast_skip_threshold_chars:
             log.info("validation_skipped_short_thought", trace_id=trace_id)
             return base
-
-        history_summary = _build_history_summary(
-            history,
-            window=config.mast_history_window,
-            max_tokens=config.mast_history_max_tokens,
+        ctx, _ = self._prepare_ctx(
+            thought, history, upstream_response, mode, trace_id, critic_model, judge_model
         )
-
-        cache_key = _cache_key(
-            thought.thought,
-            effective_critic,
-            effective_judge,
-            mode,
-            history_summary,
-            thought.branch_id,
-        )
-        bypass_cache = mode in ("brainstorm", "tot")
-        if not bypass_cache:
-            cached = self._cache.get(cache_key)
+        if not ctx.bypass_cache:
+            cached = self._cache.get(ctx.cache_key)
             if cached is not None:
                 log.info("validation_cache_hit", trace_id=trace_id)
                 return cached
-
-        ctx = _RunCtx(
-            mode=mode,
-            thought=thought,
-            history=history,
-            history_summary=history_summary,
-            upstream_response=upstream_response,
-            trace_id=trace_id,
-            base=base,
-            cache_key=cache_key,
-            bypass_cache=bypass_cache,
-            effective_critic=effective_critic,
-            effective_judge=effective_judge,
-            critic_model=critic_model,
-            judge_model=judge_model,
-        )
         result = await self._dispatch_mode(ctx)
-        if not bypass_cache:
-            self._cache.set(cache_key, result)
+        if not ctx.bypass_cache:
+            self._cache.set(ctx.cache_key, result)
         return result
 
     async def _dispatch_mode(self, ctx: _RunCtx) -> MastOutput:
