@@ -55,6 +55,7 @@ Add new entries at the end with a unique `id`.
 | `latency_p95_ms` | 95th percentile latency | — |
 
 A model pair is considered **production-ready** when:
+
 - `json_conformance_rate ≥ 0.95`
 - `verdict_accuracy ≥ 0.75`
 - `issue_type_recall ≥ 0.70`

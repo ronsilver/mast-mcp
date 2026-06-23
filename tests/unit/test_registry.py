@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os  # noqa: F401  # intentionally unused, kept for potential future fixtures
 from typing import Any
 
 import pytest

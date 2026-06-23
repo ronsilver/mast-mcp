@@ -31,6 +31,8 @@ from mast.agents.critic import CriticAgent
 from mast.agents.judge import JudgeAgent
 from mast.config import config
 
+_TIMESTAMP_FMT = "%Y%m%dT%H%M%SZ"
+
 
 def _parse_models(flag: str | None, env_key: str, fallback: str) -> list[str]:
     if flag:
@@ -55,7 +57,7 @@ async def _eval_pair(
     critic = CriticAgent(client)
     judge = JudgeAgent(client)
 
-    ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FMT)
     out_path = output_dir / _sanitize(critic_model) / _sanitize(judge_model) / f"{ts}.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 

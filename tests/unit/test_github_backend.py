@@ -22,7 +22,7 @@ async def test_chat_uses_github_endpoint(backend: GitHubBackend) -> None:
         )
         await backend.chat(model="gpt-4o-mini", system_prompt="s", fallback={})
         sent = route.calls.last.request
-        assert "models.inference.ai.azure.com" in str(sent.url)
+        assert httpx.URL(sent.url).host == "models.inference.ai.azure.com"
 
 
 @pytest.mark.asyncio
@@ -96,7 +96,7 @@ async def test_aclose(backend: GitHubBackend) -> None:
 
 def test_default_endpoint() -> None:
     b = GitHubBackend(api_key="x")
-    assert "models.inference.ai.azure.com" in str(b._http.base_url)
+    assert b._http.base_url.host == "models.inference.ai.azure.com"
 
 
 def test_is_chat_backend() -> None:

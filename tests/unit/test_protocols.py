@@ -48,7 +48,7 @@ def test_chat_returns_fallback() -> None:
 
 def test_incomplete_subclass_cannot_instantiate() -> None:
     with pytest.raises(TypeError):
-        _IncompleteBackend()  # type: ignore[abstract]
+        _IncompleteBackend()  # type: ignore[abstract]  # pylint: disable=abstract-class-instantiated
 
 
 @pytest.mark.asyncio

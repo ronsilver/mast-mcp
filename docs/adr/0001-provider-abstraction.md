@@ -63,7 +63,7 @@ behavioral benefit. Cloud backends map `num_predict`→`max_tokens`/
 
 ### Model naming
 
-```
+```text
 provider:model_id
   ollama:mistral:7b-instruct
   openai:gpt-4o-mini
@@ -86,7 +86,8 @@ Pydantic v2 settings via `pydantic-settings`, supporting:
 3. Built-in code defaults (lowest precedence).
 
 Precedence within a field:
-```
+
+```text
 real env > ${VAR} expanded > ${VAR:-default} > literal in file > default
 ```
 

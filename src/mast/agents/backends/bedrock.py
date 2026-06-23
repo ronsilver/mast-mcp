@@ -241,7 +241,6 @@ class BedrockBackend(ChatBackend):
                 "meta.llama3-1-70b-instruct-v1:0",
             ]
         try:
-            import asyncio
 
             def _call() -> list[str]:
                 response = self._boto3_client.meta.client.list_foundation_models()

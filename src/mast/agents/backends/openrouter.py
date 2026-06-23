@@ -7,9 +7,6 @@ from typing import Any
 import httpx
 import structlog
 
-from mast.agents.backends.openai import (
-    OpenAICompatBackend,  # noqa: F401  # parent class for type-checking
-)
 from mast.agents.protocols import ChatBackend, ChatResult
 from mast.config import config
 

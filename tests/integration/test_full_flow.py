@@ -100,7 +100,7 @@ async def test_judge_agent_full_flow(
     )
 
     agent = JudgeAgent(ollama_client)
-    result, latency_ms = await agent.judge(
+    result, _ = await agent.judge(
         thought="Use Redis for session caching",
         thought_number=2,
         total_thoughts=5,
