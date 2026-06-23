@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mast-ollama"
-version = "0.2.0"
-description = "Multi-Agent Sequential Thinking with Ollama — active validation for MCP sequential-thinking"
+name = "mast-mcp"
+version = "0.3.0"
+description = "Multi-Agent Sequential Thinking MCP — multi-provider validation layer for sequential-thinking (Ollama/OpenAI/Anthropic/Gemini/Bedrock/GitHub/OpenRouter)"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.12"
@@ -20,6 +20,7 @@ dependencies = [
 
 [project.scripts]
 mast-server = "mast.__main__:main"
+mast-mcp = "mast.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mast"]
@@ -36,6 +37,9 @@ dev = [
     "ruff>=0.8.0",
     "mypy>=1.13.0",
     "pydantic-settings>=2.4.0",
+]
+bedrock = [
+    "boto3>=1.34.0",
 ]
 
 [tool.ruff]
@@ -56,5 +60,8 @@ testpaths = ["tests"]
 [tool.coverage.run]
 source = ["src/mast"]
 omit = ["tests/*"]
+
+[tool.coverage.report]
+fail_under = 70
 
 

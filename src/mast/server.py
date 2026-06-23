@@ -24,7 +24,7 @@ from mast.validation.schemas import SequentialThinkingInput
 
 log = structlog.get_logger(__name__)
 
-server = Server("mast-ollama")
+server = Server("mast-mcp")
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +60,14 @@ async def _call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         judge_model = arguments.pop("judgeModel", None)
         debono_primary = arguments.pop("debonoPrimaryModel", None)
         debono_creative = arguments.pop("debonoCreativeModel", None)
-        user_mode = arguments.get("mode") or config.mast_mode
-        force_mode = "debate" if user_mode == "debate" else user_mode
+        # mast_debate defaults to "debate" if the client did not pass mode,
+        # unlike sequentialthinking which uses config.mast_mode.
+        user_mode = arguments.get("mode") or "debate"
         result = await _handle_thought(
             arguments,
             upstream=upstream,
             orchestrator=orchestrator,
-            force_mode=force_mode,
+            force_mode=user_mode,
             critic_model=critic_model or debono_primary,
             judge_model=judge_model or debono_creative,
         )
