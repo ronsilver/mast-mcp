@@ -48,6 +48,9 @@ class BedrockBackend(ChatBackend):
         self._boto3_unavailable: bool = False
         self._http: httpx.AsyncClient | None = None
 
+        self._init_auth()
+
+    def _init_auth(self) -> None:
         if self._auth_method == "iam":
             try:
                 import boto3  # type: ignore[import-not-found]
