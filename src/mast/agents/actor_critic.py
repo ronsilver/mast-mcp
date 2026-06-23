@@ -47,12 +47,16 @@ class ActorCriticOrchestrator:
         critic_model: str | None = None,
         judge_model: str | None = None,
     ) -> _RoundResult:
+        from mast.agents.critic import CritiqueRequest
+
         critic_resp, c_lat = await self._critic.critique(
-            thought=thought,
-            thought_number=thought_number,
-            total_thoughts=total_thoughts,
-            history_summary=history_summary,
-            model=critic_model,
+            CritiqueRequest(
+                thought=thought,
+                thought_number=thought_number,
+                total_thoughts=total_thoughts,
+                history_summary=history_summary,
+                model=critic_model,
+            )
         )
         needs_revision = any(i.severity in _ESCALATE_SEVERITIES for i in critic_resp.issues)
         if not needs_revision:
@@ -69,14 +73,18 @@ class ActorCriticOrchestrator:
                 ),
                 final=True,
             )
+        from mast.agents.judge import JudgeRequest
+
         judge_resp, j_lat = await self._judge.judge(
-            thought=thought,
-            thought_number=thought_number,
-            total_thoughts=total_thoughts,
-            history_summary=history_summary,
-            critique=critic_resp,
-            mode="actor_critic",
-            model=judge_model,
+            JudgeRequest(
+                thought=thought,
+                thought_number=thought_number,
+                total_thoughts=total_thoughts,
+                history_summary=history_summary,
+                critique=critic_resp,
+                mode="actor_critic",
+                model=judge_model,
+            )
         )
         next_thought = (
             judge_resp.suggested_revision

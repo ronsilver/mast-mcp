@@ -45,13 +45,17 @@ def _detect_kalman_triggers(state: _KFState, entry_count: int) -> list[str]:
         triggers.append("K2:covariance_collapse")
     if any(abs(i) > 0.5 for i in state.innovations):
         triggers.append("K4:large_innovation")
-    if (
+    if _is_stale_innovation(state):
+        triggers.append("K5:no_new_information")
+    return triggers
+
+
+def _is_stale_innovation(state: _KFState) -> bool:
+    return (
         len(state.innovations) >= 3
         and max(state.innovations[-3:]) - min(state.innovations[-3:]) < 0.02
         and state.P > 0.20
-    ):
-        triggers.append("K5:no_new_information")
-    return triggers
+    )
 
 
 class KalmanConvergenceLayer:

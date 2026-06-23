@@ -34,6 +34,7 @@ class GeminiBackend(ChatBackend):
         api_key: str | None = None,
         default_model: str | None = None,
     ) -> None:
+        """Initialize Gemini backend with optional overrides."""
         resolved_base = base_url or "https://generativelanguage.googleapis.com/v1beta"
         resolved_key = api_key or config.gemini_api_key or config.mast_api_key
         self._api_key = resolved_key

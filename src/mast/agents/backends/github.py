@@ -26,6 +26,7 @@ class GitHubBackend(ChatBackend):
         api_key: str | None = None,
         default_model: str | None = None,
     ) -> None:
+        """Initialize GitHub Models backend with optional overrides."""
         resolved_base = base_url or "https://models.inference.ai.azure.com"
         resolved_key = api_key or config.github_token or config.mast_api_key
         self._api_key = resolved_key

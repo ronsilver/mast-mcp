@@ -30,6 +30,7 @@ class OpenAICompatBackend(ChatBackend):
         api_key: str | None = None,
         default_model: str | None = None,
     ) -> None:
+        """Initialize OpenAI-compatible backend with optional overrides."""
         resolved_base = base_url or config.openai_base_url or config.effective_base_url
         if resolved_base.endswith("/"):
             resolved_base = resolved_base[:-1]

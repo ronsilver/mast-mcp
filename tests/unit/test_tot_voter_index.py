@@ -70,8 +70,10 @@ def test_apply_voter_scores_handles_empty_scores() -> None:
 
 
 def test_apply_voter_scores_handles_extra_scores() -> None:
-    """More scores than branches: extras with valid indices within range
-    are applied; extras with out-of-range are ignored."""
+    """More scores than branches: extras with valid indices within range.
+
+    Extras with out-of-range are ignored.
+    """
     branches = _make_branches(2)
     scores = [
         {"index": 0, "score": 0.4, "rationale": "a"},

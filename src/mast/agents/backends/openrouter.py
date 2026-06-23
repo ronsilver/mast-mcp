@@ -23,6 +23,7 @@ class OpenRouterBackend(ChatBackend):
         api_key: str | None = None,
         default_model: str | None = None,
     ) -> None:
+        """Initialize OpenRouter backend with optional overrides."""
         resolved_base = base_url or "https://openrouter.ai/api/v1"
         resolved_key = api_key or config.openrouter_api_key or config.mast_api_key
         self._default_model = default_model or "anthropic/claude-3.5-sonnet"

@@ -141,8 +141,10 @@ class TestKFState:
         assert state.P >= 0.0
 
     def test_default_p_threshold_is_reachable(self) -> None:
-        """Default p_threshold=0.18 should produce converged=True with
-        3 scorers of moderate confidence."""
+        """Default p_threshold=0.18 should produce converged=True.
+
+        3 scorers of moderate confidence.
+        """
         from mast.config import MastConfig
 
         cfg = MastConfig()
@@ -157,8 +159,10 @@ class TestKFState:
         assert converged is True
 
     def test_k5_trigger_fires_with_higher_threshold(self) -> None:
-        """K5 (no_new_information) trigger requires P > 0.20 and 3
-        innovations max-min < 0.02. Simulate that state."""
+        """K5 (no_new_information) trigger requires P > 0.20.
+
+        3 innovations max-min < 0.02. Simulate that state.
+        """
         from mast.agents.kalman import _detect_kalman_triggers, _KFState
 
         state = _KFState()

@@ -37,6 +37,7 @@ class AnthropicBackend(ChatBackend):
         api_key: str | None = None,
         default_model: str | None = None,
     ) -> None:
+        """Initialize Anthropic backend with optional overrides."""
         resolved_base = base_url or "https://api.anthropic.com"
         resolved_key = api_key or config.anthropic_api_key or config.mast_api_key
         self._api_key = resolved_key

@@ -39,6 +39,7 @@ class BedrockBackend(ChatBackend):
         token: str | None = None,
         default_model: str | None = None,
     ) -> None:
+        """Initialize Bedrock backend with region, auth method, and token."""
         self._region = region or config.bedrock_region
         self._auth_method = auth_method or config.bedrock_auth_method
         self._token = token or config.bedrock_token

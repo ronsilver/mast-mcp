@@ -129,7 +129,7 @@ def test_find_config_file_none(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_load_config_file_bool_expansion(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """bool values from ${VAR} should parse as TOML bool, not string."""
+    """Bool values from ${VAR} should parse as TOML bool, not string."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("FLAG", "true")
     cfg = tmp_path / "mast.toml"

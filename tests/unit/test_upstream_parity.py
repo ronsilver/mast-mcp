@@ -167,7 +167,7 @@ def test_tool_schema_matches_upstream() -> None:
 
 
 def test_revises_thought_must_exist(server: SequentialThinkingServer) -> None:
-    """revisesThought must reference an existing thought number."""
+    """RevisesThought must reference an existing thought number."""
     server.process_thought(
         {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
     )
@@ -185,7 +185,7 @@ def test_revises_thought_must_exist(server: SequentialThinkingServer) -> None:
 
 
 def test_branch_from_thought_must_exist(server: SequentialThinkingServer) -> None:
-    """branchFromThought must reference an existing thought number."""
+    """BranchFromThought must reference an existing thought number."""
     server.process_thought(
         {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
     )
@@ -205,7 +205,7 @@ def test_branch_from_thought_must_exist(server: SequentialThinkingServer) -> Non
 def test_branch_id_and_branch_from_must_both_be_present(
     server: SequentialThinkingServer,
 ) -> None:
-    """branchId without branchFromThought (and vice versa) must raise."""
+    """BranchId without branchFromThought (and vice versa) must raise."""
     server.process_thought(
         {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
     )

@@ -37,6 +37,7 @@ class OllamaBackend(ChatBackend):
     """Async client for Ollama /api/chat endpoint."""
 
     def __init__(self) -> None:
+        """Initialize Ollama backend with cloud auth if configured."""
         headers: dict[str, str] = {}
         if config.ollama_cloud_api_key:
             headers["Authorization"] = f"Bearer {config.ollama_cloud_api_key}"

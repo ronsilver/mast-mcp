@@ -83,6 +83,7 @@ class DebonoOrchestrator:
 
         Args:
             client: Pre-configured ChatBackend instance (e.g. OllamaBackend).
+
         """
         self._client = client
         self._templates: dict[str, jinja2.Template] = {}
@@ -227,6 +228,7 @@ class DebonoOrchestrator:
 
         Returns:
             Tuple of (DebonoResult with all hat outputs, blue_close raw dict).
+
         """
         if ctx is None:
             ctx = DebonoContext()

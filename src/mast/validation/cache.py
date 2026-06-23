@@ -10,6 +10,7 @@ class ValidationCache[T]:
     """Simple in-memory LRU cache with TTL expiry."""
 
     def __init__(self, ttl_seconds: int = 300, max_size: int = 256) -> None:
+        """Initialize validation cache with TTL and max size."""
         self._ttl = ttl_seconds
         self._max = max_size
         self._store: OrderedDict[str, tuple[float, T]] = OrderedDict()

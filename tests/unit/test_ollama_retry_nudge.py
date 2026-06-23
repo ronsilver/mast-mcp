@@ -42,8 +42,10 @@ async def test_retry_increments_temperature_on_parse_failure(
 async def test_fallback_latency_nonzero_after_failures(
     backend: OllamaBackend,
 ) -> None:
-    """After 2 failed attempts, the latency_ms returned with fallback
-    should reflect the time spent, not 0."""
+    """After 2 failed attempts, the latency_ms returned with fallback.
+
+    Should reflect the time spent, not 0.
+    """
     with respx.mock(base_url="http://localhost:11434") as mock:
         mock.post("/api/chat").mock(
             side_effect=[
