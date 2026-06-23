@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Multi-provider support**: 7 backends (Ollama, OpenAI, Anthropic,
+  Gemini, Amazon Bedrock, GitHub Models, OpenRouter) via `ChatBackend`
+  protocol and provider registry. See `docs/adr/0001-provider-abstraction.md`.
+- **Config file support** (`mast.toml`/`mast.json`): `${VAR}` interpolation
+  with `${VAR:-default}` fallback. Precedence: env > file > defaults.
+  See `mast.toml.example`.
+- **Strategy registry**: pluggable reasoning modes via Python entry
+  points or local `MAST_STRATEGY_DIR`. 9 built-in modes registered.
+- **Bedrock dual-auth**: `BEDROCK_AUTH_METHOD=iam` (boto3) or `token`
+  (httpx bearer, no boto3 required). Optional `[bedrock]` extra.
+- **CI hardening**: Python matrix 3.12/3.13, uv cache, `--cov-fail-under=70`,
+  Dependabot weekly updates, CodeQL security analysis.
+- **E2E tests** (`tests/integration/test_e2e_server.py`): exercise the
+  real MCP tool dispatch path through `_call_tool`, `--doctor`, and
+  `mast-server` entry point. 82% coverage.
+
+### Changed
+
+- **Renamed project**: `mast-ollama` → `mast-mcp`. PyPI distribution,
+  MCP server name, and Docker image use the new name. The `mast-server`
+  entry point is preserved for backwards compatibility; `mast-mcp`
+  is added as an alias. MCP client configs referencing `"mast-ollama"`
+  as the server key must update to `"mast-mcp"`.
+- **`--doctor`** dispatches by `MAST_MODE` (9 modes) and validates
+  provider credentials (Bedrock iam/token, OpenAI key, etc.).
+- **Cache bypass** for stochastic modes (`brainstorm`, `tot`): re-running
+  the same thought returns fresh results, not cached.
+- **ToT voter** uses explicit `index` field for branch-score mapping
+  instead of positional ordering.
+- **Kalman** default `p_threshold` raised to `0.18` for `converged=True`
+  on typical 3-scorer configurations.
+- **Ollama retry** mutates payload (JSON-only reminder) on parse failure;
+  fallback preserves real latency.
+
+### Fixed
+
+- **Race condition** in orchestrator: per-instance `self._critic_response`
+  and friends replaced with locals — concurrent `run()` calls no longer
+  mix verdicts.
+- **Schema/code inconsistency**: `KALMAN_P_THRESHOLD` env vs code default
+  aligned at `0.18`.
+
 ## [0.2.0] - 2026-05-31
 
 ### Added

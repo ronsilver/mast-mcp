@@ -1,29 +1,50 @@
-# MAST-Ollama [![Codacy Badge](https://app.codacy.com/project/badge/Grade/e1b069af215841d4a31e123bc782121f)](https://app.codacy.com/gh/ronsilver/mast-ollama/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+# MAST-MCP
 
-**Multi-Agent Sequential Thinking with Ollama** — Active validation layer for the [MCP sequential-thinking](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking) server.
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/e1b069af215841d4a31e123bc782121f)](https://app.codacy.com/gh/ronsilver/mast-mcp/dashboard)
 
-Drop-in Python replacement that challenges each reasoning step with local or cloud Ollama models before returning the result to the calling LLM.
+Multi-provider active validation layer for the
+[MCP sequential-thinking](https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking)
+server. Drop-in replacement that challenges each reasoning step with
+local or cloud LLMs before returning the result to the calling agent.
 
-Available validation strategies:
+Works with Ollama, OpenAI, Anthropic, Google Gemini, Amazon Bedrock,
+GitHub Models, OpenRouter, and any OpenAI-compatible endpoint.
 
-- **Adversarial Debate** (modes: `validate`, `debate`): a Critic identifies flaws, a Judge synthesizes a verdict
-- **De Bono Six Thinking Hats** (mode: `debono`): 7 sequential hats refine a working document through facts, creativity, benefits, risks, and intuition into a final verdict
-- **Actor-Critic Iterative Refinement** (mode: `actor_critic`): Iterative Critic+Judge loop until convergence
-- **Brainstorm** (mode: `brainstorm`): Parallel idea generators + synthesis
-- **Tree of Thoughts** (mode: `tot`): Parallel branch generation + voting
-- **Kalman Convergence** (mode: `kalman`): Bayesian fusion of quality scores
-- **Workflow** (mode: `workflow`): Chain multiple modes in sequence
+## Validation modes
+
+| Mode | Behavior |
+|---|---|
+| `validate` | Critic only — identifies issues + strengths |
+| `debate` | Critic + Judge — verdict + suggested revision |
+| `debono` | De Bono Six Thinking Hats (7 sequential hats) |
+| `actor_critic` | Iterative Critic+Judge loop until convergence |
+| `brainstorm` | N parallel generators + synthesizer |
+| `tot` | Tree of Thoughts (parallel branches + voter) |
+| `kalman` | Bayesian fusion of quality scores |
+| `workflow` | Pipeline of modes chained in sequence |
+| `passive` | Passthrough (no validation) |
 
 ## Table of Contents
 
 - [Why](#why)
 - [Quick Start](#quick-start)
+- [Providers](#providers)
+  - [Ollama](#ollama)
+  - [OpenAI](#openai)
+  - [Anthropic](#anthropic)
+  - [Gemini](#gemini)
+  - [Bedrock](#bedrock)
+  - [GitHub Models](#github-models)
+  - [OpenRouter](#openrouter)
+- [Configuration](#configuration)
+  - [Config File (`mast.toml`)](#config-file-masttoml)
+  - [Environment Variables](#environment-variables)
+  - [Precedence](#precedence)
+- [Provider Selection Guide](#provider-selection-guide)
 - [MCP Client Configuration](#mcp-client-configuration)
-- [Ollama Cloud](#ollama-cloud)
 - [Modes](#modes)
 - [Tools](#tools)
-- [De Bono Six Hats Mode](#de-bono-six-hats-mode)
-- [Environment Variables](#environment-variables)
+- [Custom Strategies](#custom-strategies)
 - [Architecture](#architecture)
 - [Development](#development)
 - [Changelog](#changelog)
@@ -31,31 +52,19 @@ Available validation strategies:
 
 ## Why
 
-The upstream `sequential-thinking` MCP server is passive — it only persists thoughts. If the main LLM hallucinates or anchors on a bad assumption, nothing corrects it. MAST adds an active validation loop using small local models (3B–8B), keeping reasoning private and cost-free.
+The upstream `sequential-thinking` MCP server is passive — it only
+persists thoughts. If the main LLM hallucinates or anchors on a bad
+assumption, nothing corrects it. MAST adds an active validation loop
+using small local models (3B–8B) for privacy and cost, or any
+frontier model for max quality. The same MCP tool API — drop-in
+compatible with the original.
 
 ## Quick Start
 
-### Prerequisites
-
-- [Ollama](https://ollama.com) running locally or an [Ollama Cloud](https://ollama.com/pricing) account
-- Pull the required models for your chosen strategy:
+### Install via `uvx`
 
 ```bash
-# Debate mode (Critic + Judge):
-ollama pull mistral:7b-instruct
-ollama pull deepseek-r1:8b
-
-# Debono mode (Six Hats):
-ollama pull qwen2.5:3b
-ollama pull qwen2.5:1.5b
-```
-
-For Ollama Cloud, see the [Cloud section](#ollama-cloud).
-
-### Run with `uvx`
-
-```bash
-uvx --from git+https://github.com/ronsilver/mast-ollama.git mast-server
+uvx --from git+https://github.com/ronsilver/mast-mcp.git mast-server
 ```
 
 ### Verify setup
@@ -64,24 +73,315 @@ uvx --from git+https://github.com/ronsilver/mast-ollama.git mast-server
 mast-server --doctor
 ```
 
-Checks Ollama connectivity and validates that all models configured via env vars are pulled and available.
+Checks backend connectivity, validates credentials, and lists required
+vs available models for the active mode.
+
+## Providers
+
+MAST ships with 7 backend implementations, all interchangeable via
+`MAST_PROVIDER` or the `mast.toml` config file.
+
+### Ollama
+
+Default provider. Local-first; no API key required.
+
+```bash
+MAST_PROVIDER=ollama \
+OLLAMA_BASE_URL=http://localhost:11434 \
+CRITIC_MODEL=mistral:7b-instruct \
+JUDGE_MODEL=deepseek-r1:8b \
+mast-server
+```
+
+[Ollama Cloud](https://ollama.com/pricing) supported via the same
+provider with `OLLAMA_BASE_URL=https://ollama.com/api` +
+`OLLAMA_CLOUD_API_KEY=sk-xxx`.
+
+### OpenAI
+
+```bash
+MAST_PROVIDER=openai \
+OPENAI_API_KEY=sk-xxx \
+CRITIC_MODEL=gpt-4o-mini \
+JUDGE_MODEL=gpt-4o-mini \
+mast-server
+```
+
+Also accepts `OPENAI_BASE_URL` to point at vLLM, LM Studio, TGI, or
+any OpenAI-compatible endpoint.
+
+### Anthropic
+
+```bash
+MAST_PROVIDER=anthropic \
+ANTHROPIC_API_KEY=sk-ant-xxx \
+CRITIC_MODEL=claude-3-5-sonnet-20241022 \
+JUDGE_MODEL=claude-3-5-sonnet-20241022 \
+mast-server
+```
+
+### Gemini
+
+```bash
+MAST_PROVIDER=gemini \
+GEMINI_API_KEY=xxx \
+CRITIC_MODEL=gemini-2.0-flash \
+JUDGE_MODEL=gemini-2.0-flash \
+mast-server
+```
+
+### Bedrock
+
+Dual authentication supported:
+
+```bash
+# Token auth (no boto3 needed)
+MAST_PROVIDER=bedrock \
+BEDROCK_AUTH_METHOD=token \
+BEDROCK_TOKEN=xxx \
+AWS_REGION=us-east-1 \
+CRITIC_MODEL=anthropic.claude-3-5-sonnet-20241022-v2:0 \
+mast-server
+
+# IAM auth (requires boto3 — pip install mast-mcp[bedrock])
+MAST_PROVIDER=bedrock \
+BEDROCK_AUTH_METHOD=iam \
+AWS_REGION=us-east-1 \
+AWS_PROFILE=default \
+CRITIC_MODEL=anthropic.claude-3-5-sonnet-20241022-v2:0 \
+mast-server
+```
+
+### GitHub Models
+
+```bash
+MAST_PROVIDER=github \
+GITHUB_TOKEN=ghp_xxx \
+CRITIC_MODEL=gpt-4o-mini \
+JUDGE_MODEL=gpt-4o-mini \
+mast-server
+```
+
+### OpenRouter
+
+```bash
+MAST_PROVIDER=openrouter \
+OPENROUTER_API_KEY=sk-or-xxx \
+CRITIC_MODEL=anthropic/claude-3.5-sonnet \
+JUDGE_MODEL=anthropic/claude-3.5-sonnet \
+mast-server
+```
+
+## Configuration
+
+Three layers, merged in this order (highest precedence wins):
+
+1. **Environment variables** — `MAST_*`, `OPENAI_*`, `ANTHROPIC_*`, etc.
+2. **Config file** — `mast.toml` or `mast.json` with `${VAR}` interpolation
+3. **Built-in defaults** — defined in source code
+
+### Config File (`mast.toml`)
+
+Place `mast.toml` in any of these locations (first found wins):
+
+- `$MAST_CONFIG_FILE` (any path)
+- `./mast.toml` or `./mast.json`
+- `~/.config/mast/config.toml` or `~/.config/mast/config.json`
+
+The file supports `${VAR}` interpolation with optional defaults:
+
+```toml
+# mast.toml — copied from mast.toml.example
+[provider]
+default = "openai"                    # or ${MAST_PROVIDER:-openai}
+
+[provider.openai]
+api_key = ${OPENAI_API_KEY}            # required, resolved at load
+
+[provider.bedrock]
+auth_method = "token"                  # or ${BEDROCK_AUTH_METHOD:-iam}
+region = "us-east-1"                   # or ${AWS_REGION:-us-east-1}
+token = ${BEDROCK_TOKEN}               # bearer token when auth=token
+
+[provider.ollama]
+base_url = "http://localhost:11434"    # or ${OLLAMA_BASE_URL:-http://localhost:11434}
+
+[strategy]
+default = "debate"                     # or ${MAST_MODE:-debate}
+dir = "~/.config/mast/strategies"      # custom strategies dir
+
+[agents]
+critic_model = "gpt-4o-mini"           # or ${CRITIC_MODEL:-gpt-4o-mini}
+judge_model  = "gpt-4o-mini"
+
+[modes.debono]
+blue_open_model = "qwen2.5:3b"
+# ... (7 hats)
+
+[modes.workflow]
+stages = "debate,kalman"
+```
+
+**`${VAR}` rules:**
+
+- `${VAR}` — replaced by env var value. **Error** if unset (fail fast).
+- `${VAR:-default}` — replaced by env var, or `default` if unset/empty.
+- Lowercase identifiers are not expanded.
+- See [`mast.toml.example`](mast.toml.example) for the full template.
+
+> **Security:** `mast.toml` is gitignored by default. **Never** commit
+> it with real credentials.
+
+### Environment Variables
+
+#### Provider selection
+
+| Variable | Default | Description |
+|---|---|---|
+| `MAST_PROVIDER` | `ollama` | One of: `ollama`, `openai`, `anthropic`, `gemini`, `bedrock`, `github`, `openrouter`. If unset, auto-detect from available credentials |
+| `MAST_BASE_URL` | — | Generic base URL override |
+| `MAST_API_KEY` | — | Generic API key (provider-specific keys take precedence) |
+| `MAST_CONFIG_FILE` | — | Explicit path to `mast.toml` |
+
+#### Ollama
+
+| Variable | Default | Description |
+|---|---|---|
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server endpoint |
+| `OLLAMA_CLOUD_API_KEY` | — | Bearer token for `https://ollama.com/api` |
+| `OLLAMA_TOP_P` | `0.9` | Top-p sampling |
+
+#### OpenAI-compatible
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | — | OpenAI API key |
+| `OPENAI_BASE_URL` | — | Override for vLLM/LM Studio/TGI |
+
+#### Anthropic
+
+| Variable | Default | Description |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | — | Anthropic API key |
+
+#### Gemini
+
+| Variable | Default | Description |
+|---|---|---|
+| `GEMINI_API_KEY` | — | Google Gemini API key |
+
+#### Bedrock
+
+| Variable | Default | Description |
+|---|---|---|
+| `BEDROCK_AUTH_METHOD` | `iam` | `iam` (SigV4 via boto3) or `token` (bearer via httpx) |
+| `BEDROCK_TOKEN` | — | Bearer token (required when `BEDROCK_AUTH_METHOD=token`) |
+| `AWS_REGION` | `us-east-1` | Bedrock region |
+| `AWS_PROFILE` | — | AWS CLI profile (iam only) |
+| `AWS_ACCESS_KEY_ID` | — | Explicit IAM creds (optional) |
+| `AWS_SECRET_ACCESS_KEY` | — | Explicit IAM creds (optional) |
+| `AWS_SESSION_TOKEN` | — | STS session token (optional) |
+
+#### GitHub Models
+
+| Variable | Default | Description |
+|---|---|---|
+| `GITHUB_TOKEN` | — | GitHub PAT for Models inference |
+
+#### OpenRouter
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENROUTER_API_KEY` | — | OpenRouter API key |
+
+#### Server / behavior
+
+| Variable | Default | Description |
+|---|---|---|
+| `MAST_MODE` | `debate` | Default validation mode |
+| `MAST_TIMEOUT_MS` | `15000` | Per-call backend timeout |
+| `MAST_FORMAT_MODE` | `schema` | Ollama JSON format: `schema`, `json`, `text` |
+| `MAST_SKIP_THRESHOLD_CHARS` | `20` | Skip validation for thoughts under this many chars |
+| `MAST_CACHE_TTL_S` | `300` | Validation cache TTL (stochastic modes always bypass) |
+| `MAST_MAX_HISTORY` | `50` | Max thoughts retained in server memory |
+| `MAST_HISTORY_WINDOW` | `3` | Most recent thoughts shown in full to agents |
+| `MAST_HISTORY_MAX_TOKENS` | `1500` | Max tokens in history context |
+| `MAST_LOG_LEVEL` | `INFO` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
+| `MAST_STRATEGY_DIR` | — | Custom strategy plugins directory (e.g. `~/.config/mast/strategies`) |
+| `DISABLE_THOUGHT_LOGGING` | `false` | Suppress console thought output |
+| `MAST_COLOR_THOUGHTS` | `false` | ANSI colours in console output |
+
+#### Agent models
+
+| Variable | Default | Description |
+|---|---|---|
+| `CRITIC_MODEL` | `mistral:7b-instruct` | Critic model (validate, debate, actor_critic, workflow) |
+| `JUDGE_MODEL` | `deepseek-r1:8b` | Judge model (debate, actor_critic, workflow) |
+
+#### Mode-specific
+
+| Variable | Default | Mode |
+|---|---|---|
+| `DEBONO_BLUE_OPEN_MODEL` | `qwen2.5:3b` | debono |
+| `DEBONO_WHITE_MODEL` | `qwen2.5:3b` | debono |
+| `DEBONO_GREEN_MODEL` | `qwen2.5:1.5b` | debono |
+| `DEBONO_YELLOW_MODEL` | `qwen2.5:3b` | debono |
+| `DEBONO_BLACK_MODEL` | `qwen2.5:3b` | debono |
+| `DEBONO_RED_MODEL` | `qwen2.5:1.5b` | debono |
+| `DEBONO_BLUE_CLOSE_MODEL` | `qwen2.5:3b` | debono |
+| `DEBONO_SKIP_RED` | `false` | Skip Red hat entirely |
+| `ACTOR_CRITIC_MAX_ROUNDS` | `3` | actor_critic |
+| `BRAINSTORM_MODELS` | `llama3:8b,mistral:7b` | brainstorm (comma-separated) |
+| `BRAINSTORM_SYNTH_MODEL` | `qwen2.5:14b` | brainstorm |
+| `TOT_BRANCH_MODELS` | `llama3:8b,mistral:7b,qwen2.5:7b` | tot |
+| `TOT_VOTER_MODEL` | `deepseek-r1:8b` | tot |
+| `KALMAN_SCORER_MODELS` | `mistral:7b,qwen2.5:7b,phi3:mini` | kalman |
+| `KALMAN_P_THRESHOLD` | `0.18` | kalman convergence threshold |
+| `KALMAN_ACCEPT_THRESHOLD` | `0.70` | kalman min score to accept |
+| `MAST_WORKFLOW_STAGES` | `debate,kalman` | workflow chain |
+
+## Precedence
+
+For any given field, the value is resolved in this order:
+
+```text
+real env var > ${VAR} expanded > ${VAR:-default} > literal in file > code default
+```
+
+Examples:
+
+| Source | `api_key = "sk-xxx"` | `${OPENAI_API_KEY}` (env set) | `${OPENAI_API_KEY}` (env unset) |
+|---|---|---|---|
+| env `OPENAI_API_KEY=sk-yyy` | `sk-yyy` wins | `sk-yyy` wins | `sk-xxx` wins |
+| env unset | `sk-xxx` wins | **error** | `sk-xxx` wins |
+
+## Provider Selection Guide
+
+| Priority | If you need... | Recommended provider |
+|---|---|---|
+| Privacy, free, offline | Local inference | **Ollama** (3B–8B models) |
+| Best quality | Frontier reasoning | **Anthropic** (`claude-3-5-sonnet`) or **Gemini** (`gemini-2.0-flash`) |
+| Cheapest cloud | Pay-per-token minimal cost | **OpenRouter** (DeepSeek, Llama, etc.) |
+| GitHub Copilot users | Already have GitHub token | **GitHub Models** |
+| AWS enterprise | IAM roles, VPC, audit logs | **Bedrock** (iam) |
+| Self-hosted OpenAI | vLLM, LM Studio, llama.cpp server | **OpenAI** + `OPENAI_BASE_URL` override |
+| Multi-model router | Switch models per request | **OpenRouter** with `provider:model` syntax |
 
 ## MCP Client Configuration
 
-Add to your MCP client config (`claude_desktop_config.json`, `~/.cursor/mcp.json`, `.vscode/mcp.json`, etc.). Works with any MCP-compatible agent: Claude Desktop, Cursor, VS Code, Continue, and others.
+Add to your MCP client config (`claude_desktop_config.json`,
+`~/.cursor/mcp.json`, `.vscode/mcp.json`, etc.).
 
-### Debate strategy (Critic + Judge)
+### Ollama (default)
 
 ```json
 {
   "mcpServers": {
-    "mast-ollama": {
+    "mast-mcp": {
       "command": "uvx",
-      "args": [
-        "--from", "git+https://github.com/ronsilver/mast-ollama.git",
-        "mast-server"
-      ],
+      "args": ["--from", "git+https://github.com/ronsilver/mast-mcp.git", "mast-server"],
       "env": {
+        "MAST_PROVIDER": "ollama",
         "OLLAMA_BASE_URL": "http://localhost:11434",
         "CRITIC_MODEL": "mistral:7b-instruct",
         "JUDGE_MODEL": "deepseek-r1:8b",
@@ -92,19 +392,36 @@ Add to your MCP client config (`claude_desktop_config.json`, `~/.cursor/mcp.json
 }
 ```
 
-### Debono strategy (Six Hats)
+### OpenAI
 
 ```json
 {
   "mcpServers": {
-    "mast-ollama": {
+    "mast-mcp": {
       "command": "uvx",
-      "args": [
-        "--from", "git+https://github.com/ronsilver/mast-ollama.git",
-        "mast-server"
-      ],
+      "args": ["mast-mcp"],
       "env": {
-        "OLLAMA_BASE_URL": "http://localhost:11434",
+        "MAST_PROVIDER": "openai",
+        "OPENAI_API_KEY": "sk-xxx",
+        "CRITIC_MODEL": "gpt-4o-mini",
+        "JUDGE_MODEL": "gpt-4o-mini",
+        "MAST_MODE": "debate"
+      }
+    }
+  }
+}
+```
+
+### Debono (Six Hats)
+
+```json
+{
+  "mcpServers": {
+    "mast-mcp": {
+      "command": "uvx",
+      "args": ["mast-mcp"],
+      "env": {
+        "MAST_PROVIDER": "ollama",
         "MAST_MODE": "debono",
         "DEBONO_BLUE_OPEN_MODEL": "qwen2.5:3b",
         "DEBONO_WHITE_MODEL": "qwen2.5:3b",
@@ -119,71 +436,24 @@ Add to your MCP client config (`claude_desktop_config.json`, `~/.cursor/mcp.json
 }
 ```
 
-## Ollama Cloud
+### Migration from v0.2.x (Ollama-only)
 
-MAST supports both local Ollama and [Ollama Cloud](https://ollama.com/pricing). Two access modes:
-
-### A) Direct Cloud API
-
-Connect directly to `https://ollama.com/api` with an API key:
-
-```bash
-OLLAMA_BASE_URL=https://ollama.com/api \
-OLLAMA_CLOUD_API_KEY=sk-xxx \
-CRITIC_MODEL=mistral:7b-instruct \
-mast-server
-```
-
-API keys are created at [ollama.com/settings/keys](https://ollama.com/settings/keys).
-
-### B) Local Proxy
-
-Authenticate locally, then add `-cloud` suffix to model names:
-
-```bash
-ollama signin
-DEBONO_WHITE_MODEL=qwen2.5:3b-cloud mast-server
-```
-
-The local Ollama instance proxies to cloud transparently.
-
-### Cloud configuration examples
-
-```json
-// Debate mode
-{
-  "env": {
-    "OLLAMA_BASE_URL": "https://ollama.com/api",
-    "OLLAMA_CLOUD_API_KEY": "sk-xxx",
-    "CRITIC_MODEL": "mistral:7b-instruct",
-    "JUDGE_MODEL": "deepseek-r1:8b",
-    "MAST_MODE": "debate"
-  }
-}
-
-// Debono mode
-{
-  "env": {
-    "OLLAMA_BASE_URL": "https://ollama.com/api",
-    "OLLAMA_CLOUD_API_KEY": "sk-xxx",
-    "MAST_MODE": "debono",
-    "DEBONO_BLUE_OPEN_MODEL": "qwen2.5:3b"
-  }
-}
-```
+If upgrading from `mast-ollama`, replace the server name `"mast-ollama"`
+with `"mast-mcp"` in your client config and rename any references to
+the old GitHub repo. The `mast-server` entry point is preserved.
 
 ## Modes
 
 | Mode | Behavior | Extra latency |
 |---|---|---|
 | `passive` | Identical to upstream sequential-thinking (passthrough) | 0 ms |
-| `validate` | Critic only — identifies issues + strengths | ~1x critic model |
-| `debate` | Critic + Judge — verdict + suggested revision | ~2x |
+| `validate` | Critic only | ~1x critic model |
+| `debate` | Critic + Judge | ~2x |
 | `debono` | De Bono Six Hats: Blue, White, Green, Yellow, Black, Red, Blue Close | ~5s |
-| `actor_critic` | Iterative Critic+Judge loop up to ACTOR_CRITIC_MAX_ROUNDS | ~2x x rounds |
-| `brainstorm` | N parallel generators + Synthesizer | ~2x x N models |
-| `tot` | N parallel branch generators + Voter | ~2x x N branches |
-| `kalman` | N scorers + Kalman filter fusion | ~1x x N scorers |
+| `actor_critic` | Iterative Critic+Judge loop up to `ACTOR_CRITIC_MAX_ROUNDS` | ~2x × rounds |
+| `brainstorm` | N parallel generators + Synthesizer | ~2x × N models |
+| `tot` | N parallel branch generators + Voter | ~2x × N branches |
+| `kalman` | N scorers + Bayesian fusion | ~1x × N scorers |
 | `workflow` | Pipeline of modes chained in sequence | Sum of stages |
 
 ## Tools
@@ -192,136 +462,101 @@ The local Ollama instance proxies to cloud transparently.
 
 Same as upstream sequential-thinking plus optional MAST fields:
 
-- `mode`: `"passive" | "validate" | "debate" | "debono" | "actor_critic" | "brainstorm" | "tot" | "kalman" | "workflow"` — overrides server default for this step
+- `mode`: override the server default for this step
 - `skipValidation`: bypass validation for this specific thought
 
 ### `mast_debate` (extended)
 
 Same schema as `sequentialthinking` plus optional model overrides per call:
 
-- `criticModel`, `judgeModel` — override the Critic/Judge models (debate, actor_critic)
-- `debonoPrimaryModel`, `debonoCreativeModel` — override primary/creative models (debono mode)
+- `criticModel`, `judgeModel` — override the Critic/Judge models
+- `debonoPrimaryModel`, `debonoCreativeModel` — override primary/creative (debono)
 
-When no `mode` is specified, defaults to `debate`. Explicit `mode` from the client is respected.
+When no `mode` is specified, defaults to `debate`. Explicit `mode` from
+the client is respected.
 
-## De Bono Six Hats Mode
+## Custom Strategies
 
-When `MAST_MODE=debono`, each reasoning step passes through 7 sequential hats. Each hat receives the current working document and returns an enriched version:
+MAST ships with 9 built-in strategies. You can add more via two
+mechanisms:
 
-| Step | Hat | Role | Default Model |
-|---|---|---|---|
-| 1 | Blue Open | Define problem, set objective | `qwen2.5:3b` |
-| 2 | White | Facts, data, unknowns | `qwen2.5:3b` |
-| 3 | Green | Creative alternatives, lateral thinking | `qwen2.5:1.5b` |
-| 4 | Yellow | Benefits, value, prune weak ideas | `qwen2.5:3b` |
-| 5 | Black | Risks, mitigations, harden plan | `qwen2.5:3b` |
-| 6 | Red | Gut feeling, intuition (30s, optional) | `qwen2.5:1.5b` |
-| 7 | Blue Close | Synthesize, verdict, suggested revision | `qwen2.5:3b` |
+### Entry points (pip packages)
 
-Red hat can be disabled entirely by setting `DEBONO_SKIP_RED=true`.
+Publish a Python package with an entry point in `pyproject.toml`:
 
-## Environment Variables
+```toml
+[project.entry-points."mast.strategies"]
+my_strategy = "my_pkg.strategies:MyStrategy"
+```
 
-### Core
+`MyStrategy` must expose a `name` attribute and an async `run` method
+matching the `Strategy` protocol.
 
-| Variable | Default | Description |
-|---|---|---|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server endpoint |
-| `OLLAMA_CLOUD_API_KEY` | — | Ollama Cloud API key for `https://ollama.com/api` |
-| `MAST_MODE` | `debate` | Default validation mode |
-| `MAST_TIMEOUT_MS` | `15000` | Per-call Ollama timeout |
-| `MAST_FORMAT_MODE` | `schema` | Ollama JSON format: `schema`, `json`, or `text` |
-| `MAST_SKIP_THRESHOLD_CHARS` | `20` | Skip validation if thought is under this many chars |
-| `MAST_CACHE_TTL_S` | `300` | Validation cache TTL (seconds) |
-| `MAST_MAX_HISTORY` | `50` | Maximum thoughts retained in server memory |
-| `MAST_HISTORY_WINDOW` | `3` | Most recent thoughts shown in full to agents |
-| `MAST_HISTORY_MAX_TOKENS` | `1500` | Max tokens in history context sent to agents |
-| `MAST_LOG_LEVEL` | `INFO` | Log level: `DEBUG`, `INFO`, `WARN`, `ERROR` |
-| `DISABLE_THOUGHT_LOGGING` | `false` | Suppress console thought output (upstream compat) |
-| `MAST_COLOR_THOUGHTS` | `false` | ANSI colours in console thought output |
-| `OLLAMA_TOP_P` | `0.9` | Ollama top-p sampling parameter |
+### Local directory (`MAST_STRATEGY_DIR`)
 
-### Debate mode (Critic + Judge)
+Drop a `.py` file in `~/.config/mast/strategies/` (or wherever
+`MAST_STRATEGY_DIR` points):
 
-| Variable | Default | Description |
-|---|---|---|
-| `CRITIC_MODEL` | `mistral:7b-instruct` | Critic model |
-| `JUDGE_MODEL` | `deepseek-r1:8b` | Judge model |
+```python
+# ~/.config/mast/strategies/redteam.py
+from typing import Any
+from mast.validation.strategy import Strategy
 
-### Debono mode (Six Hats)
+class RedTeamStrategy:
+    name = "redteam"
 
-| Variable | Default | Description |
-|---|---|---|
-| `DEBONO_BLUE_OPEN_MODEL` | `qwen2.5:3b` | Blue Open hat model |
-| `DEBONO_WHITE_MODEL` | `qwen2.5:3b` | White hat model |
-| `DEBONO_GREEN_MODEL` | `qwen2.5:1.5b` | Green hat model |
-| `DEBONO_YELLOW_MODEL` | `qwen2.5:3b` | Yellow hat model |
-| `DEBONO_BLACK_MODEL` | `qwen2.5:3b` | Black hat model |
-| `DEBONO_RED_MODEL` | `qwen2.5:1.5b` | Red hat model |
-| `DEBONO_BLUE_CLOSE_MODEL` | `qwen2.5:3b` | Blue Close hat model |
-| `DEBONO_SKIP_RED` | `false` | Skip Red hat entirely |
+    async def run(
+        self,
+        thought,
+        history,
+        upstream_response,
+        *,
+        critic_model=None,
+        judge_model=None,
+        backend,
+        cache,
+    ) -> Any:
+        # ... your custom validation logic ...
+        return None
+```
 
-### Actor-Critic mode
-
-| Variable | Default | Description |
-|---|---|---|
-| `ACTOR_CRITIC_MAX_ROUNDS` | `3` | Maximum iterative refinement rounds |
-
-### Brainstorm mode
-
-| Variable | Default | Description |
-|---|---|---|
-| `BRAINSTORM_MODELS` | `llama3:8b,mistral:7b` | Comma-separated generator models |
-| `BRAINSTORM_SYNTH_MODEL` | `qwen2.5:14b` | Synthesizer model |
-
-### Tree of Thoughts mode
-
-| Variable | Default | Description |
-|---|---|---|
-| `TOT_BRANCH_MODELS` | `llama3:8b,mistral:7b,qwen2.5:7b` | Comma-separated branch generator models |
-| `TOT_VOTER_MODEL` | `deepseek-r1:8b` | Voter model |
-
-### Kalman Convergence mode
-
-| Variable | Default | Description |
-|---|---|---|
-| `KALMAN_SCORER_MODELS` | `mistral:7b,qwen2.5:7b,phi3:mini` | Comma-separated scorer models |
-| `KALMAN_P_THRESHOLD` | `0.05` | Convergence threshold for P (uncertainty) |
-| `KALMAN_ACCEPT_THRESHOLD` | `0.70` | Minimum x to accept |
-
-### Workflow mode
-
-| Variable | Default | Description |
-|---|---|---|
-| `MAST_WORKFLOW_STAGES` | `debate,kalman` | Comma-separated modes to chain |
+MAST auto-discovers `*.py` files in this directory at startup. Built-in
+strategy names win on conflict (warnings logged).
 
 ## Architecture
 
 ```text
 LLM Client → MCP sequentialthinking tool
                     ↓
-              MAST Server
+              MAST Server (mast-mcp)
               ├── __main__.py        (entry point)
-              ├── _upstream.py       (1:1 port of lib.ts)
+              ├── _upstream.py       (1:1 port of upstream lib.ts)
+              ├── config.py          (Pydantic settings + mast.toml)
+              ├── config_loader.py   (TOML/JSON + ${VAR} resolver)
               ├── agents/
-              │   ├── base.py        (Ollama HTTP client)
-              │   ├── critic.py      → Ollama (Critic)        [debate, actor_critic]
-              │   ├── judge.py       → Ollama (Judge)          [debate, actor_critic]
-              │   ├── debono.py      → Ollama x7 hats          [debono]
-              │   ├── actor_critic.py (iterative loop wrapper) [actor_critic]
-              │   ├── brainstorm.py  → Ollama x N generators   [brainstorm]
-              │   ├── tot.py         → Ollama x N branches     [tot]
-              │   └── kalman.py      → Ollama x N scorers      [kalman]
+              │   ├── protocols.py   (ChatBackend ABC)
+              │   ├── registry.py    (provider factory + auto-detect)
+              │   ├── base.py        (OllamaBackend)
+              │   ├── backends/
+              │   │   ├── openai.py  (OpenAICompatBackend)
+              │   │   ├── openrouter.py
+              │   │   ├── github.py
+              │   │   ├── anthropic.py
+              │   │   ├── gemini.py
+              │   │   └── bedrock.py (iam + token dual-auth)
+              │   ├── critic.py, judge.py, debono.py
+              │   ├── actor_critic.py, brainstorm.py
+              │   ├── tot.py, kalman.py
+              │   └── _json_utils.py (shared defensive parser)
               ├── validation/
               │   ├── orchestrator.py (mode dispatch)
-              │   ├── cache.py       (LRU+TTL cache)
+              │   ├── cache.py       (LRU+TTL)
+              │   ├── strategy.py    (Strategy Protocol)
+              │   ├── registry.py    (entry-point + dir loader)
+              │   ├── strategies/    (9 built-in placeholders)
               │   └── schemas.py     (Pydantic models)
               └── prompts/
-                  ├── debate/
-                  ├── debono/
-                  ├── brainstorm/
-                  ├── tot/
-                  └── kalman/
+                  ├── debate/, debono/, brainstorm/, tot/, kalman/
 ```
 
 ## Development
@@ -331,19 +566,25 @@ uv venv
 source .venv/bin/activate
 uv sync --extra dev
 
-# Run all tests
+# Run all tests (343 expected)
 make test
 
-# Test coverage (terminal + HTML report)
+# Coverage (terminal + HTML report, gate ≥ 70%)
 make coverage
 
-# Lint and type check
+# Lint, format, type check
 make lint
 make format
 make typecheck
 
 # Full check (lint + format + type + test)
 make check
+
+# Install Bedrock extra (optional)
+uv sync --extra bedrock
+
+# Verify backend connectivity
+mast-server --doctor
 ```
 
 ## Changelog
