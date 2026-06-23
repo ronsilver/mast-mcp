@@ -48,4 +48,11 @@ Thumbs.db
 .env.local
 *.pem
 
+# Config files (may contain credentials)
+mast.toml
+mast.json
+config.toml
+config.json
+~/.config/mast/strategies/
+
 uv.lock
