@@ -33,6 +33,23 @@ log = structlog.get_logger(__name__)
 
 
 @dataclass
+class _RunCtx:
+    mode: str
+    thought: ThoughtData
+    history: list[ThoughtData]
+    history_summary: str
+    upstream_response: dict[str, object]
+    trace_id: str
+    base: MastOutput
+    cache_key: str
+    bypass_cache: bool
+    effective_critic: str
+    effective_judge: str
+    critic_model: str | None = None
+    judge_model: str | None = None
+
+
+@dataclass
 class _WorkflowStageCtx:
     stage_mode: str
     current_thought: str
@@ -223,7 +240,7 @@ class ValidationOrchestrator:
                 log.info("validation_cache_hit", trace_id=trace_id)
                 return cached
 
-        result = await self._dispatch_mode(
+        ctx = _RunCtx(
             mode=mode,
             thought=thought,
             history=history,
@@ -238,277 +255,205 @@ class ValidationOrchestrator:
             critic_model=critic_model,
             judge_model=judge_model,
         )
+        result = await self._dispatch_mode(ctx)
         if not bypass_cache:
             self._cache.set(cache_key, result)
         return result
 
-    async def _dispatch_mode(
-        self,
-        mode: str,
-        thought: ThoughtData,
-        history: list[ThoughtData],
-        history_summary: str,
-        upstream_response: dict[str, object],
-        trace_id: str,
-        base: MastOutput,
-        cache_key: str,
-        bypass_cache: bool,
-        effective_critic: str,
-        effective_judge: str,
-        critic_model: str | None,
-        judge_model: str | None,
-    ) -> MastOutput:
-        if mode == "debono":
-            return await self._run_debono_mode(
-                thought, history_summary, critic_model, judge_model, base, trace_id
-            )
-        if mode == "actor_critic":
-            return await self._run_actor_critic_mode(
-                thought, history_summary, critic_model, judge_model, base, trace_id
-            )
-        if mode == "brainstorm":
-            return await self._run_brainstorm_mode(thought, history_summary, base, trace_id)
-        if mode == "tot":
-            return await self._run_tot_mode(thought, history_summary, base, trace_id)
-        if mode == "kalman":
-            return await self._run_kalman_mode(thought, history_summary, base, trace_id)
-        if mode == "workflow":
-            return await self._run_workflow_mode(
-                thought, history, upstream_response, trace_id, base, critic_model, judge_model
-            )
-        return await self._run_critic_judge_mode(
-            thought, history_summary, mode, trace_id, base, effective_critic, effective_judge
-        )
+    async def _dispatch_mode(self, ctx: _RunCtx) -> MastOutput:
+        if ctx.mode == "debono":
+            return await self._run_debono_mode(ctx)
+        if ctx.mode == "actor_critic":
+            return await self._run_actor_critic_mode(ctx)
+        if ctx.mode == "brainstorm":
+            return await self._run_brainstorm_mode(ctx)
+        if ctx.mode == "tot":
+            return await self._run_tot_mode(ctx)
+        if ctx.mode == "kalman":
+            return await self._run_kalman_mode(ctx)
+        if ctx.mode == "workflow":
+            return await self._run_workflow_mode(ctx)
+        return await self._run_critic_judge_mode(ctx)
 
-    async def _run_debono_mode(
-        self,
-        thought: ThoughtData,
-        history_summary: str,
-        critic_model: str | None,
-        judge_model: str | None,
-        base: MastOutput,
-        trace_id: str,
-    ) -> MastOutput:
+    async def _run_debono_mode(self, ctx: _RunCtx) -> MastOutput:
         debono_result, blue_close = await self._run_debono(
-            thought, history_summary, critic_model, judge_model
+            ctx.thought, ctx.history_summary, ctx.critic_model, ctx.judge_model
         )
-        base.debono = debono_result
+        ctx.base.debono = debono_result
         verdict_raw = str(blue_close.get("verdict", "accept"))
         try:
-            base.verdict = Verdict(verdict_raw)
+            ctx.base.verdict = Verdict(verdict_raw)
         except ValueError:
-            base.verdict = Verdict.ACCEPT
+            ctx.base.verdict = Verdict.ACCEPT
         confidence_val = blue_close.get("confidence", 0.5)
-        base.confidence = float(confidence_val) if isinstance(confidence_val, (int, float)) else 0.5
+        ctx.base.confidence = (
+            float(confidence_val) if isinstance(confidence_val, (int, float)) else 0.5
+        )
         revision_val = blue_close.get("suggested_revision")
-        base.suggested_revision = (
+        ctx.base.suggested_revision = (
             str(revision_val)
             if revision_val is not None and isinstance(revision_val, str)
             else None
         )
-        base.judge_model = debono_result.hats[-1].model if debono_result.hats else None
-        base.judge_latency_ms = debono_result.total_latency_ms
+        ctx.base.judge_model = debono_result.hats[-1].model if debono_result.hats else None
+        ctx.base.judge_latency_ms = debono_result.total_latency_ms
         log.info(
             "debono_done",
-            trace_id=trace_id,
-            thought_number=thought.thought_number,
+            trace_id=ctx.trace_id,
+            thought_number=ctx.thought.thought_number,
             hats=len(debono_result.hats),
-            verdict=base.verdict.value if base.verdict else None,
+            verdict=ctx.base.verdict.value if ctx.base.verdict else None,
             total_latency_ms=debono_result.total_latency_ms,
         )
-        return base
+        return ctx.base
 
-    async def _run_actor_critic_mode(
-        self,
-        thought: ThoughtData,
-        history_summary: str,
-        critic_model: str | None,
-        judge_model: str | None,
-        base: MastOutput,
-        trace_id: str,
-    ) -> MastOutput:
+    async def _run_actor_critic_mode(self, ctx: _RunCtx) -> MastOutput:
         ac_result = await self._actor_critic.run(
-            thought=thought.thought,
-            thought_number=thought.thought_number,
-            total_thoughts=thought.total_thoughts,
-            history_summary=history_summary,
-            critic_model=critic_model,
-            judge_model=judge_model,
+            thought=ctx.thought.thought,
+            thought_number=ctx.thought.thought_number,
+            total_thoughts=ctx.thought.total_thoughts,
+            history_summary=ctx.history_summary,
+            critic_model=ctx.critic_model,
+            judge_model=ctx.judge_model,
         )
-        base.actor_critic = ac_result
-        base.verdict = Verdict.ACCEPT if ac_result.converged else Verdict.REVISE
-        base.confidence = 1.0 if ac_result.converged else 0.5
-        base.suggested_revision = ac_result.final_thought
+        ctx.base.actor_critic = ac_result
+        ctx.base.verdict = Verdict.ACCEPT if ac_result.converged else Verdict.REVISE
+        ctx.base.confidence = 1.0 if ac_result.converged else 0.5
+        ctx.base.suggested_revision = ac_result.final_thought
         log.info(
             "actor_critic_done",
-            trace_id=trace_id,
-            thought_number=thought.thought_number,
+            trace_id=ctx.trace_id,
+            thought_number=ctx.thought.thought_number,
             total_rounds=ac_result.total_rounds,
             converged=ac_result.converged,
         )
-        return base
+        return ctx.base
 
-    async def _run_brainstorm_mode(
-        self,
-        thought: ThoughtData,
-        history_summary: str,
-        base: MastOutput,
-        trace_id: str,
-    ) -> MastOutput:
+    async def _run_brainstorm_mode(self, ctx: _RunCtx) -> MastOutput:
         bs_result = await self._brainstorm.run(
-            thought=thought.thought,
-            thought_number=thought.thought_number,
-            total_thoughts=thought.total_thoughts,
-            history_summary=history_summary,
+            thought=ctx.thought.thought,
+            thought_number=ctx.thought.thought_number,
+            total_thoughts=ctx.thought.total_thoughts,
+            history_summary=ctx.history_summary,
         )
-        base.brainstorm = bs_result
-        base.verdict = Verdict.REVISE
-        base.suggested_revision = bs_result.synthesis
+        ctx.base.brainstorm = bs_result
+        ctx.base.verdict = Verdict.REVISE
+        ctx.base.suggested_revision = bs_result.synthesis
         log.info(
             "brainstorm_done",
-            trace_id=trace_id,
-            thought_number=thought.thought_number,
+            trace_id=ctx.trace_id,
+            thought_number=ctx.thought.thought_number,
             ideas=len(bs_result.ideas),
         )
-        return base
+        return ctx.base
 
-    async def _run_tot_mode(
-        self,
-        thought: ThoughtData,
-        history_summary: str,
-        base: MastOutput,
-        trace_id: str,
-    ) -> MastOutput:
+    async def _run_tot_mode(self, ctx: _RunCtx) -> MastOutput:
         tot_result = await self._tot.run(
-            thought=thought.thought,
-            thought_number=thought.thought_number,
-            total_thoughts=thought.total_thoughts,
-            history_summary=history_summary,
+            thought=ctx.thought.thought,
+            thought_number=ctx.thought.thought_number,
+            total_thoughts=ctx.thought.total_thoughts,
+            history_summary=ctx.history_summary,
         )
-        base.tot = tot_result
+        ctx.base.tot = tot_result
         if tot_result.selected_branch:
-            base.verdict = Verdict.REVISE
-            base.suggested_revision = tot_result.selected_branch.next_step
+            ctx.base.verdict = Verdict.REVISE
+            ctx.base.suggested_revision = tot_result.selected_branch.next_step
         log.info(
             "tot_done",
-            trace_id=trace_id,
-            thought_number=thought.thought_number,
+            trace_id=ctx.trace_id,
+            thought_number=ctx.thought.thought_number,
             branches=len(tot_result.branches),
             selected=tot_result.selected_branch is not None,
         )
-        return base
+        return ctx.base
 
-    async def _run_kalman_mode(
-        self,
-        thought: ThoughtData,
-        history_summary: str,
-        base: MastOutput,
-        trace_id: str,
-    ) -> MastOutput:
+    async def _run_kalman_mode(self, ctx: _RunCtx) -> MastOutput:
         k_result = await self._kalman.run(
-            thought=thought.thought,
-            thought_number=thought.thought_number,
-            total_thoughts=thought.total_thoughts,
-            history_summary=history_summary,
+            thought=ctx.thought.thought,
+            thought_number=ctx.thought.thought_number,
+            total_thoughts=ctx.thought.total_thoughts,
+            history_summary=ctx.history_summary,
         )
-        base.kalman = k_result
-        base.verdict = k_result.verdict
-        base.confidence = k_result.confidence
+        ctx.base.kalman = k_result
+        ctx.base.verdict = k_result.verdict
+        ctx.base.confidence = k_result.confidence
         log.info(
             "kalman_done",
-            trace_id=trace_id,
-            thought_number=thought.thought_number,
+            trace_id=ctx.trace_id,
+            thought_number=ctx.thought.thought_number,
             x=round(k_result.x_final, 3),
             converged=k_result.converged,
             verdict=k_result.verdict.value,
         )
-        return base
+        return ctx.base
 
-    async def _run_workflow_mode(
-        self,
-        thought: ThoughtData,
-        history: list[ThoughtData],
-        upstream_response: dict[str, object],
-        trace_id: str,
-        base: MastOutput,
-        critic_model: str | None,
-        judge_model: str | None,
-    ) -> MastOutput:
+    async def _run_workflow_mode(self, ctx: _RunCtx) -> MastOutput:
         stages = config.workflow_stages
         workflow_result = await self._run_workflow(
-            thought,
-            history,
-            upstream_response,
+            ctx.thought,
+            ctx.history,
+            ctx.upstream_response,
             stages,
-            trace_id,
-            critic_model=critic_model,
-            judge_model=judge_model,
+            ctx.trace_id,
+            critic_model=ctx.critic_model,
+            judge_model=ctx.judge_model,
         )
-        base.workflow = workflow_result
+        ctx.base.workflow = workflow_result
         if workflow_result.stages:
             last = workflow_result.stages[-1]
-            base.verdict = last.verdict
-            base.confidence = last.confidence
-            base.suggested_revision = last.suggested_revision
+            ctx.base.verdict = last.verdict
+            ctx.base.confidence = last.confidence
+            ctx.base.suggested_revision = last.suggested_revision
         log.info(
             "workflow_done",
-            trace_id=trace_id,
-            thought_number=thought.thought_number,
+            trace_id=ctx.trace_id,
+            thought_number=ctx.thought.thought_number,
             stages=len(workflow_result.stages),
             final_verdict=workflow_result.stages[-1].verdict.value
             if workflow_result.stages
             else None,
         )
-        return base
+        return ctx.base
 
-    async def _run_critic_judge_mode(
-        self,
-        thought: ThoughtData,
-        history_summary: str,
-        mode: str,
-        trace_id: str,
-        base: MastOutput,
-        effective_critic: str,
-        effective_judge: str,
-    ) -> MastOutput:
+    async def _run_critic_judge_mode(self, ctx: _RunCtx) -> MastOutput:
         critic_response, critic_latency = await self._run_critic(
-            thought, history_summary, effective_critic
+            ctx.thought, ctx.history_summary, ctx.effective_critic
         )
         log.info(
             "critic_done",
-            trace_id=trace_id,
-            thought_number=thought.thought_number,
+            trace_id=ctx.trace_id,
+            thought_number=ctx.thought.thought_number,
             issues=len(critic_response.issues),
             latency_ms=critic_latency,
-            model=effective_critic,
+            model=ctx.effective_critic,
         )
-        base.validation = ValidationResult(
+        ctx.base.validation = ValidationResult(
             issues=critic_response.issues,
             strengths=critic_response.strengths,
-            critic_model=effective_critic,
+            critic_model=ctx.effective_critic,
             critic_latency_ms=critic_latency,
         )
-        if mode == "validate":
-            return base
+        if ctx.mode == "validate":
+            return ctx.base
 
         judge_response, judge_latency = await self._run_judge(
-            thought, history_summary, mode, effective_judge, critic_response
+            ctx.thought, ctx.history_summary, ctx.mode, ctx.effective_judge, critic_response
         )
         log.info(
             "judge_done",
-            trace_id=trace_id,
-            thought_number=thought.thought_number,
+            trace_id=ctx.trace_id,
+            thought_number=ctx.thought.thought_number,
             verdict=judge_response.verdict,
             confidence=judge_response.confidence,
             latency_ms=judge_latency,
-            model=effective_judge,
+            model=ctx.effective_judge,
         )
-        base.verdict = judge_response.verdict
-        base.confidence = judge_response.confidence
-        base.suggested_revision = judge_response.suggested_revision
-        base.judge_model = effective_judge
-        base.judge_latency_ms = judge_latency
-        return base
+        ctx.base.verdict = judge_response.verdict
+        ctx.base.confidence = judge_response.confidence
+        ctx.base.suggested_revision = judge_response.suggested_revision
+        ctx.base.judge_model = ctx.effective_judge
+        ctx.base.judge_latency_ms = judge_latency
+        return ctx.base
 
     async def _run_workflow(
         self,

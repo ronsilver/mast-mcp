@@ -6,14 +6,11 @@ TGI, llama.cpp server, and any other OpenAI-compatible endpoint.
 
 from __future__ import annotations
 
-import json
-import time
 from typing import Any
 
 import httpx
 import structlog
 
-from mast.agents._json_utils import extract_json
 from mast.agents.protocols import ChatBackend, ChatResult
 from mast.config import config
 
@@ -78,55 +75,18 @@ class OpenAICompatBackend(ChatBackend):
         else:
             payload["response_format"] = {"type": "json_object"}
 
-        content = ""
-        last_latency_ms = 0
-        for attempt in range(2):
-            t0 = time.monotonic()
-            try:
-                response = await self._http.post(
-                    "/chat/completions",
-                    json=payload,
-                    headers=self._auth_headers(),
-                )
-                latency_ms = int((time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                response.raise_for_status()
-                raw = response.json()
-                content = raw["choices"][0]["message"]["content"]
-                parsed: dict[str, Any] = json.loads(content)
-                return parsed, latency_ms
-            except json.JSONDecodeError as exc:
-                latency_ms = int((time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                log.warning(
-                    "openai_json_parse_failed",
-                    attempt=attempt,
-                    error=str(exc),
-                    model=model,
-                )
-                extracted = extract_json(content)
-                if extracted is not None:
-                    return extracted, latency_ms
-                if attempt == 0:
-                    payload["messages"] = [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": "Respond with JSON only, no prose."},
-                    ]
-                    continue
-            except (KeyError, IndexError) as exc:
-                latency_ms = int((time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                log.warning("openai_response_key_missing", error=str(exc), model=model)
-                if attempt == 0:
-                    continue
-            except httpx.HTTPError as exc:
-                latency_ms = int((time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                log.error("openai_http_error", error=str(exc), model=model)
-                return fallback, latency_ms
+        from mast.agents._utils import _retry_parse
 
-        log.warning("openai_validation_failed_using_fallback", model=model)
-        return fallback, last_latency_ms
+        return await _retry_parse(
+            self._http,
+            "/chat/completions",
+            payload,
+            self._auth_headers(),
+            lambda raw: raw["choices"][0]["message"]["content"],
+            fallback,
+            model,
+            "openai",
+        )
 
     async def list_models(self) -> list[str]:
         """Return list of model IDs from /v1/models."""
