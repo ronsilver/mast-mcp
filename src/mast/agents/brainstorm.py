@@ -8,7 +8,7 @@ import jinja2
 import structlog
 
 from mast.agents._utils import load_prompt
-from mast.agents.base import OllamaClient
+from mast.agents.protocols import ChatBackend
 from mast.config import config
 from mast.validation.schemas import BrainstormIdea, BrainstormResult
 
@@ -18,7 +18,7 @@ log = structlog.get_logger(__name__)
 class BrainstormOrchestrator:
     """Parallel divergence to synthesis convergence orchestrator."""
 
-    def __init__(self, client: OllamaClient) -> None:
+    def __init__(self, client: ChatBackend) -> None:
         """Initialize with Ollama client and load prompt templates."""
         self._client = client
         self._idea_tpl = jinja2.Template(

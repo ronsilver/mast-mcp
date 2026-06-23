@@ -1,63 +1,26 @@
-"""Async Ollama HTTP client."""
+"""Ollama backend — implements ChatBackend for Ollama /api/chat + /api/tags."""
 
 from __future__ import annotations
 
 import json
-import re
 import time
 from typing import Any
 
 import httpx
 import structlog
 
+from mast.agents._json_utils import CRITIC_FALLBACK, JUDGE_FALLBACK, extract_json
+from mast.agents.protocols import ChatBackend, ChatResult
 from mast.config import config
 
 log = structlog.get_logger(__name__)
 
-# Minimum valid fallback shape for Critic responses
-_CRITIC_FALLBACK: dict[str, Any] = {
-    "issues": [],
-    "strengths": [],
-    "summary": "validation_failed",
-}
-
-# Minimum valid fallback shape for Judge responses
-_JUDGE_FALLBACK: dict[str, Any] = {
-    "verdict": "accept",
-    "confidence": 0.0,
-    "rationale": "validation_failed",
-    "suggestedRevision": None,
-}
-
-_THINK_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
-_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
-
-
-def _extract_json(text: str) -> dict[str, Any] | None:
-    """Defensively extract first balanced JSON object from arbitrary model output.
-
-    Tolerates: <think> blocks, code fences, prose prefixes/suffixes.
-    Uses raw_decode so it stops at the first complete JSON object.
-    """
-    # 1. Strip reasoning blocks emitted by some models.
-    text = _THINK_RE.sub("", text)
-
-    # 2. If code fence present, extract only its content.
-    fence_match = _FENCE_RE.search(text)
-    if fence_match:
-        text = fence_match.group(1)
-
-    decoder = json.JSONDecoder()
-    for i, ch in enumerate(text):
-        if ch != "{":
-            continue
-        try:
-            obj, _ = decoder.raw_decode(text, i)
-            if isinstance(obj, dict):
-                return obj
-        except json.JSONDecodeError:
-            continue
-    return None
+# Re-exports for backwards compatibility with existing imports.
+# Existing callers (critic.py, judge.py, tests) import these names from base.
+# Will be removed in T13 when call sites migrate to _json_utils directly.
+_extract_json = extract_json
+_CRITIC_FALLBACK = CRITIC_FALLBACK
+_JUDGE_FALLBACK = JUDGE_FALLBACK
 
 
 def _build_format(json_schema: dict[str, Any] | None) -> dict[str, Any] | str | None:
@@ -70,7 +33,7 @@ def _build_format(json_schema: dict[str, Any] | None) -> dict[str, Any] | str | 
     return "json"
 
 
-class OllamaClient:
+class OllamaBackend(ChatBackend):
     """Async client for Ollama /api/chat endpoint."""
 
     def __init__(self) -> None:
@@ -92,7 +55,7 @@ class OllamaClient:
         num_predict: int = 512,
         fallback: dict[str, Any],
         json_schema: dict[str, Any] | None = None,
-    ) -> tuple[dict[str, Any], int]:
+    ) -> ChatResult:
         """Call /api/chat and return (parsed_json, latency_ms).
 
         On parse failure after one retry, returns (fallback, latency_ms).
@@ -113,42 +76,46 @@ class OllamaClient:
             payload["format"] = fmt
 
         content = ""
+        last_latency_ms = 0
         for attempt in range(2):
             t0 = time.monotonic()
             try:
                 response = await self._http.post("/api/chat", json=payload)
                 latency_ms = int((time.monotonic() - t0) * 1000)
+                last_latency_ms = latency_ms
                 response.raise_for_status()
                 raw = response.json()
                 content = raw["message"]["content"]
-                # Fast path: model returned clean JSON.
                 parsed: dict[str, Any] = json.loads(content)
                 return parsed, latency_ms
             except json.JSONDecodeError as exc:
                 latency_ms = int((time.monotonic() - t0) * 1000)
+                last_latency_ms = latency_ms
                 log.warning(
                     "ollama_json_parse_failed",
                     attempt=attempt,
                     error=str(exc),
                     model=model,
                 )
-                extracted = _extract_json(content)
+                extracted = extract_json(content)
                 if extracted is not None:
                     return extracted, latency_ms
                 if attempt == 0:
                     continue
             except KeyError as exc:
                 latency_ms = int((time.monotonic() - t0) * 1000)
+                last_latency_ms = latency_ms
                 log.warning("ollama_response_key_missing", error=str(exc), model=model)
                 if attempt == 0:
                     continue
             except httpx.HTTPError as exc:
                 latency_ms = int((time.monotonic() - t0) * 1000)
+                last_latency_ms = latency_ms
                 log.error("ollama_http_error", error=str(exc), model=model)
                 return fallback, latency_ms
 
         log.warning("ollama_validation_failed_using_fallback", model=model)
-        return fallback, 0
+        return fallback, last_latency_ms
 
     async def list_models(self) -> list[str]:
         """Return list of locally available model names."""
@@ -162,3 +129,8 @@ class OllamaClient:
 
     async def aclose(self) -> None:
         await self._http.aclose()
+
+
+# Backwards-compatible alias for existing imports.
+# Will be removed once all call sites migrate to OllamaBackend.
+OllamaClient = OllamaBackend

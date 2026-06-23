@@ -6,9 +6,9 @@ from dataclasses import dataclass
 
 import structlog
 
-from mast.agents.base import OllamaClient
 from mast.agents.critic import CriticAgent
 from mast.agents.judge import JudgeAgent
+from mast.agents.protocols import ChatBackend
 from mast.config import config
 from mast.validation.schemas import (
     ActorCriticResult,
@@ -32,7 +32,7 @@ class _RoundResult:
 class ActorCriticOrchestrator:
     """Iterative Critic+Judge refinement loop until convergence."""
 
-    def __init__(self, client: OllamaClient) -> None:
+    def __init__(self, client: ChatBackend) -> None:
         """Initialize with CriticAgent and JudgeAgent wrapping the given client."""
         self._critic = CriticAgent(client)
         self._judge = JudgeAgent(client)

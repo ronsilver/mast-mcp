@@ -8,8 +8,9 @@ import jinja2
 import structlog
 from pydantic import ValidationError
 
+from mast.agents._json_utils import JUDGE_FALLBACK
 from mast.agents._utils import load_prompt
-from mast.agents.base import _JUDGE_FALLBACK, OllamaClient
+from mast.agents.protocols import ChatBackend
 from mast.config import config
 from mast.validation.schemas import CriticResponse, JudgeResponse, Verdict
 
@@ -17,7 +18,7 @@ log = structlog.get_logger(__name__)
 
 
 class JudgeAgent:
-    def __init__(self, client: OllamaClient) -> None:
+    def __init__(self, client: ChatBackend) -> None:
         self._client = client
         self._template = jinja2.Template(
             load_prompt("mast.prompts.debate", "judge.md"),
@@ -52,7 +53,7 @@ class JudgeAgent:
             system_prompt=prompt,
             temperature=0.4,
             num_predict=1024,
-            fallback=_JUDGE_FALLBACK,
+            fallback=JUDGE_FALLBACK,
             json_schema=JudgeResponse.model_json_schema(),
         )
 

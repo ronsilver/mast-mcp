@@ -10,7 +10,7 @@ import jinja2
 import structlog
 
 from mast.agents._utils import load_prompt
-from mast.agents.base import OllamaClient
+from mast.agents.protocols import ChatBackend
 from mast.config import config
 from mast.validation.schemas import (
     DebonoResult,
@@ -78,11 +78,11 @@ class DebonoContext:
 class DebonoOrchestrator:
     """Runs the 7 De Bono hats in sequence, passing a working_document between them."""
 
-    def __init__(self, client: OllamaClient) -> None:
-        """Initialize the orchestrator with an Ollama client.
+    def __init__(self, client: ChatBackend) -> None:
+        """Initialize the orchestrator with a ChatBackend instance.
 
         Args:
-            client: Pre-configured OllamaClient instance.
+            client: Pre-configured ChatBackend instance (e.g. OllamaBackend).
         """
         self._client = client
         self._templates: dict[str, jinja2.Template] = {}
