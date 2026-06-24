@@ -181,21 +181,23 @@ class BedrockBackend(ChatBackend):
                 last_latency_ms = latency_ms
                 content = self._extract_bedrock_content(raw, is_anthropic, json_schema)
                 if content:
-                    return _json.loads(content), latency_ms
-            except _json.JSONDecodeError:
-                extracted = extract_json(content)
-                if extracted is not None:
-                    return extracted, last_latency_ms
-                if attempt == 0:
-                    continue
-            except (KeyError, IndexError):
-                if attempt == 0:
-                    continue
-            except (httpx.HTTPError, RuntimeError) as exc:
-                log.error("bedrock_http_error", error=str(exc), model=m)
+                    parsed = self._try_parse(content)
+                    if parsed is not None:
+                        return parsed, latency_ms
+            except (httpx.HTTPError, RuntimeError, KeyError, IndexError) as exc:
+                log.error("bedrock_response_error", error=str(exc), model=m)
                 return fallback, last_latency_ms
+            if attempt == 0:
+                continue
         log.warning("bedrock_validation_failed_using_fallback", model=m)
         return fallback, last_latency_ms
+
+    def _try_parse(self, content: str) -> dict[str, Any] | None:
+        try:
+            result: dict[str, Any] = _json.loads(content)
+            return result
+        except _json.JSONDecodeError:
+            return extract_json(content)
 
     def _build_bedrock_body(
         self,

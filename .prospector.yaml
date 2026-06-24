@@ -1,0 +1,13 @@
+---
+strictness: medium
+doc-warnings: true
+test-warnings: true
+
+pydocstyle:
+  disable:
+    - D212  # contradicts D213 (summary on first vs second line)
+    - D203  # "blank line before class docstring" contradicts D211, unusual style
+
+pycodestyle:
+  disable:
+    - E704  # false positive on Protocol method stubs (def + ... on next line)
