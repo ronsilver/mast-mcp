@@ -202,6 +202,21 @@ class MastConfig(BaseSettings):
         return [s.strip() for s in self.workflow_stages_str.split(",") if s.strip()]
 
 
+def _walk_config_dict(obj: object, prefix: str, out: dict[str, str]) -> None:
+    if not isinstance(obj, dict):
+        return
+    for k_raw, v_raw in obj.items():
+        if not isinstance(k_raw, str):
+            continue
+        key = f"{prefix}{k_raw}" if not prefix else f"{prefix}_{k_raw}"
+        if isinstance(v_raw, dict):
+            _walk_config_dict(v_raw, key, out)
+        elif isinstance(v_raw, str):
+            out[key] = expand_env_value(v_raw)
+        else:
+            out[key] = str(v_raw)
+
+
 def _load_config_with_interpolation() -> dict[str, object]:
     """
     Load TOML/JSON config file and expand ${VAR} placeholders.
@@ -219,23 +234,7 @@ def _load_config_with_interpolation() -> dict[str, object]:
         return {}
 
     out: dict[str, str] = {}
-
-    def walk(obj: object, prefix: str) -> None:
-        if not isinstance(obj, dict):
-            return
-        items: list[tuple[object, object]] = list(obj.items())
-        for k_raw, v_raw in items:
-            if not isinstance(k_raw, str):
-                continue
-            key = f"{prefix}{k_raw}" if not prefix else f"{prefix}_{k_raw}"
-            if isinstance(v_raw, dict):
-                walk(v_raw, key)
-            elif isinstance(v_raw, str):
-                out[key] = expand_env_value(v_raw)
-            else:
-                out[key] = str(v_raw)
-
-    walk(raw, "")
+    _walk_config_dict(raw, "", out)
     return out  # type: ignore[return-value]
 
 

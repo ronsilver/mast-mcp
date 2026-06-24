@@ -230,12 +230,7 @@ def _check_models(models: list[str]) -> None:
     print("✅ All required models available. Ready to run!", flush=True)
 
 
-async def _doctor() -> None:
-    """Validate backend connectivity, credentials, and model availability."""
-    from mast.agents.registry import get_backend
-
-    client = get_backend(config.mast_provider)
-
+def _print_doctor_header() -> None:
     print("🩺 MAST-MCP Doctor", flush=True)
     print(f"  Provider    : {config.mast_provider}", flush=True)
     print(f"  Base URL    : {config.effective_base_url}", flush=True)
@@ -244,11 +239,16 @@ async def _doctor() -> None:
         print(f"  Auth method : {config.bedrock_auth_method}", flush=True)
     print("", flush=True)
 
-    _check_credentials()
 
+async def _doctor() -> None:
+    """Validate backend connectivity, credentials, and model availability."""
+    from mast.agents.registry import get_backend
+
+    client = get_backend(config.mast_provider)
+    _print_doctor_header()
+    _check_credentials()
     models = await client.list_models()
     await client.aclose()
-
     _check_models(models)
 
 
