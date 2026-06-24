@@ -91,7 +91,7 @@ class SequentialThinkingServer:
         thought_number: int = data["thoughtNumber"]
         total_thoughts: int = data["totalThoughts"]
         if thought_number > total_thoughts:
-            total_thoughts = thought_number
+            total_thoughts = max(total_thoughts, thought_number)
 
         return ThoughtData(
             thought=data["thought"],

@@ -1,5 +1,7 @@
 # Multi-Agent Sequential Thinking (MAST-MCP) Agent Architecture
 
+> **MAST** = Multi-Agent Sequential Thinking — an active validation layer for LLM reasoning.
+
 ## Project Overview
 
 The MAST (Multi-Agent Sequential Thinking) server is a drop-in Python replacement
@@ -22,7 +24,8 @@ Two reasoning strategies are implemented:
 - [CRITICAL] **Tone:** Direct, technical, concise. Verify before asserting. Admit unknowns.
 - [CRITICAL] **Principles:** Right > easy. Code is source of truth.
   Do not assume anything. If in doubt, ask the user.
-  Read, run, observe, then assert. If verifying is impossible, state `INFERRED` explicitly.
+  Read, run, observe, then assert.
+  If verifying is impossible, state `INFERRED` explicitly.
 - [CRITICAL] **Human oversight:** Irreversible actions (delete, deploy, secret rotation) require user confirmation.
 
 ---
@@ -47,7 +50,8 @@ If any step fails, fix before proceeding.
 - [CRITICAL] **Code changes (T2+):** Agent may implement after explicit approval.
 - [IMPORTANT] **Configuration changes:** Before modifying environment variables, CI configuration, or project dependencies — confirm with the user.
 - [CRITICAL] **Deploy/release:** Do not push to remote automatically.
-- [IMPORTANT] **Push command:** Output `git push origin <branch>` for the user to run manually. Only push when the user explicitly confirms.
+- [IMPORTANT] **Push command:** Output `git push origin <branch>` for the user to run manually.
+- [IMPORTANT] **Push confirmation:** Only push when the user explicitly confirms.
 
 ---
 
@@ -82,15 +86,15 @@ When modifying this project, the agent should:
 
 ## Tools
 
-- `make check` — lint + format + typecheck + test + mdlint
-- `make coverage` — test coverage gate (≥70%)
-- `make lint` — ruff linting
-- `make format` — ruff format check
-- `make typecheck` — mypy strict type checking
-- `make mdlint` — markdown linting
-- `make test` — pytest with asyncio
+- [INFO] `make check` — lint + format + typecheck + test + mdlint
+- [INFO] `make coverage` — test coverage gate (≥70%)
+- [INFO] `make lint` — ruff linting
+- [INFO] `make format` — ruff format check
+- [INFO] `make typecheck` — mypy strict type checking
+- [INFO] `make mdlint` — markdown linting
+- [INFO] `make test` — pytest with asyncio
 
 ## Glossary
 
-- **MAST**: Multi-Agent Sequential Thinking — an active validation layer for LLM reasoning.
-- **MCP**: Model Context Protocol.
+- [INFO] **MAST**: Multi-Agent Sequential Thinking — an active validation layer for LLM reasoning.
+- [INFO] **MCP**: Model Context Protocol.
