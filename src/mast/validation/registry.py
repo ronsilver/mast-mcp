@@ -27,6 +27,16 @@ log = structlog.get_logger(__name__)
 _strategies: dict[str, object] = {}
 
 
+def _validate_strategy(strategy: object) -> tuple[str, object]:
+    name = getattr(strategy, "name", None)
+    if not isinstance(name, str):
+        raise TypeError(f"Cannot register {strategy!r}: missing string `name` attribute.")
+    run = getattr(strategy, "run", None)
+    if not callable(run):
+        raise TypeError(f"Cannot register {name!r}: missing callable `run` method.")
+    return name, run
+
+
 def register(strategy: object) -> None:
     """
     Register a strategy instance.
@@ -35,12 +45,7 @@ def register(strategy: object) -> None:
     first). Accepts any object exposing a string `name` attribute and a
     callable `run` method. Runtime checks enforce the contract.
     """
-    name = getattr(strategy, "name", None)
-    if not isinstance(name, str):
-        raise TypeError(f"Cannot register {strategy!r}: missing string `name` attribute.")
-    run = getattr(strategy, "run", None)
-    if not callable(run):
-        raise TypeError(f"Cannot register {name!r}: missing callable `run` method.")
+    name, _ = _validate_strategy(strategy)
     if name in _strategies:
         log.warning("strategy_already_registered", name=name, kept="existing")
         return
