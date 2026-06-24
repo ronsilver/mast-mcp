@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Score eval results — computes metrics from run_eval.py output JSONL files.
+"""
+Score eval results — computes metrics from run_eval.py output JSONL files.
 
 Usage:
     python evals/score.py evals/results/

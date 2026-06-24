@@ -41,7 +41,8 @@ If any step fails, fix before proceeding.
 
 ### Permission Boundaries
 
-- [CRITICAL] **Code changes:** Agent may implement after confirming scope with user (T0 reversible) or after explicit approval (T2+ irreversible).
+- [CRITICAL] **Code changes (T0):** Agent may implement after confirming scope with user.
+- [CRITICAL] **Code changes (T2+):** Agent may implement after explicit approval.
 - [IMPORTANT] **Configuration changes:** Before modifying environment variables, CI configuration, or project dependencies — confirm with the user.
 - [CRITICAL] **Deploy/release:** Do not push to remote automatically.
 - [IMPORTANT] **Push command:** Output `git push origin <branch>` for the user to run manually. Only push when the user explicitly confirms.

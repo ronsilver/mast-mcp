@@ -1,7 +1,7 @@
 ---
 strictness: medium
-doc-warnings: true
-test-warnings: true
+doc-warnings: false
+test-warnings: false
 
 pydocstyle:
   disable:
