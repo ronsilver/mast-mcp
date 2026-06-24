@@ -48,22 +48,11 @@ class GitHubBackend(ChatBackend):
         fallback: dict[str, Any],
         json_schema: dict[str, Any] | None = None,
     ) -> ChatResult:
-        payload: dict[str, Any] = {
-            "model": model or self._default_model,
-            "messages": [{"role": "system", "content": system_prompt}],
-            "temperature": temperature,
-            "max_tokens": num_predict,
-        }
-        if json_schema is not None:
-            payload["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {"name": "mast_response", "schema": json_schema},
-            }
-        else:
-            payload["response_format"] = {"type": "json_object"}
+        from mast.agents._utils import _build_openai_payload, _retry_parse
 
-        from mast.agents._utils import _retry_parse
-
+        payload = _build_openai_payload(
+            model, system_prompt, temperature, num_predict, self._default_model, json_schema
+        )
         return await _retry_parse(
             self._http,
             "/chat/completions",

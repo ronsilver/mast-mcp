@@ -77,3 +77,28 @@ def _nudge_payload(payload: dict[str, Any]) -> None:
         payload["messages"][0],
         {"role": "user", "content": "Respond with JSON only, no prose."},
     ]
+
+
+def _build_openai_payload(
+    model: str,
+    system_prompt: str,
+    temperature: float,
+    num_predict: int,
+    default_model: str,
+    json_schema: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a standard OpenAI-compatible /chat/completions payload."""
+    payload: dict[str, Any] = {
+        "model": model or default_model,
+        "messages": [{"role": "system", "content": system_prompt}],
+        "temperature": temperature,
+        "max_tokens": num_predict,
+    }
+    if json_schema is not None:
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {"name": "mast_response", "schema": json_schema, "strict": False},
+        }
+    else:
+        payload["response_format"] = {"type": "json_object"}
+    return payload
