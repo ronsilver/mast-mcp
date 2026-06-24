@@ -1,4 +1,5 @@
-"""Configuration via environment variables + optional TOML/JSON file with Pydantic v2.
+"""
+Configuration via environment variables + optional TOML/JSON file with Pydantic v2.
 
 Resolution order per field:
     1. Real env var set directly (highest)
@@ -202,7 +203,8 @@ class MastConfig(BaseSettings):
 
 
 def _load_config_with_interpolation() -> dict[str, object]:
-    """Load TOML/JSON config file and expand ${VAR} placeholders.
+    """
+    Load TOML/JSON config file and expand ${VAR} placeholders.
 
     Called before MastConfig instantiation so pydantic-settings sees
     expanded values as if they were env vars.

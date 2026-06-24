@@ -1,4 +1,5 @@
-"""TOML/JSON config file loader with ${VAR} env interpolation.
+"""
+TOML/JSON config file loader with ${VAR} env interpolation.
 
 Search order:
     $MAST_CONFIG_FILE > ./mast.toml > ~/.config/mast/config.toml > absent
@@ -23,7 +24,8 @@ _VAR_RE = re.compile(r"\$\{([A-Z_][A-Z0-9_]*)(?::-([^}]*))?\}")
 
 
 def expand_vars(text: str, source: str = "<config>") -> str:
-    """Expand ${VAR} and ${VAR:-default} placeholders in a string.
+    """
+    Expand ${VAR} and ${VAR:-default} placeholders in a string.
 
     Raises ValueError on unset variable without default.
     """
@@ -45,7 +47,8 @@ def expand_vars(text: str, source: str = "<config>") -> str:
 
 
 def _find_config_file() -> Path | None:
-    """Return the first existing config file path, or None.
+    """
+    Return the first existing config file path, or None.
 
     Search order:
         $MAST_CONFIG_FILE (any suffix)
@@ -76,7 +79,8 @@ def _find_config_file() -> Path | None:
 
 
 def load_config_file() -> dict[str, object]:
-    """Load and expand the first existing config file.
+    """
+    Load and expand the first existing config file.
 
     Returns an empty dict if no file exists.
     """

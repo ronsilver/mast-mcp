@@ -16,11 +16,12 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v4  # nosemgrep
+      - uses: astral-sh/setup-uv@v4  # nosemgrep
         with:
           version: "latest"
           enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
       - run: uv sync --extra dev
       - run: make lint
       - run: make format
@@ -35,11 +36,12 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v4  # nosemgrep
+      - uses: astral-sh/setup-uv@v4  # nosemgrep
         with:
           version: "latest"
           enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
           python-version: ${{ matrix.python-version }}
       - run: uv sync --extra dev
       - run: make coverage

@@ -1,4 +1,5 @@
-"""Port 1:1 of upstream sequential-thinking TypeScript server logic.
+"""
+Port 1:1 of upstream sequential-thinking TypeScript server logic.
 
 Reference: https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking
 This module must not contain any MAST-specific logic. Keep it as a faithful

@@ -141,7 +141,8 @@ def test_passive_output_shape(server: SequentialThinkingServer) -> None:
 
 
 def test_tool_schema_matches_upstream() -> None:
-    """Our exported schema must match the upstream fixture exactly.
+    """
+    Our exported schema must match the upstream fixture exactly.
 
     Intentional extensions (mode, skipValidation) only exist in mast_debate;
     the sequentialthinking schema must be a 1:1 port.
@@ -167,7 +168,7 @@ def test_tool_schema_matches_upstream() -> None:
 
 
 def test_revises_thought_must_exist(server: SequentialThinkingServer) -> None:
-    """RevisesThought must reference an existing thought number."""
+    """The revises_thought field must reference an existing thought number."""
     server.process_thought(
         {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
     )
@@ -185,7 +186,7 @@ def test_revises_thought_must_exist(server: SequentialThinkingServer) -> None:
 
 
 def test_branch_from_thought_must_exist(server: SequentialThinkingServer) -> None:
-    """BranchFromThought must reference an existing thought number."""
+    """The branch_from_thought field must reference an existing thought number."""
     server.process_thought(
         {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
     )
@@ -205,7 +206,7 @@ def test_branch_from_thought_must_exist(server: SequentialThinkingServer) -> Non
 def test_branch_id_and_branch_from_must_both_be_present(
     server: SequentialThinkingServer,
 ) -> None:
-    """BranchId without branchFromThought (and vice versa) must raise."""
+    """The branch_id field without branch_from_thought must raise."""
     server.process_thought(
         {"thought": "T1", "thoughtNumber": 1, "totalThoughts": 3, "nextThoughtNeeded": True}
     )

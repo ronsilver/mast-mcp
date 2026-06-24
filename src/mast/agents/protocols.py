@@ -1,4 +1,5 @@
-"""Abstract base class for inference backends.
+"""
+Abstract base class for inference backends.
 
 Defines the contract every ChatBackend implementation must satisfy.
 The chat() signature mirrors the existing OllamaClient.chat() exactly
@@ -14,7 +15,8 @@ ChatResult = tuple[dict[str, Any], int]
 
 
 class ChatBackend(ABC):
-    """Provider-agnostic async inference client.
+    """
+    Provider-agnostic async inference client.
 
     Implementations: OllamaBackend, OpenAICompatBackend,
     AnthropicBackend, GeminiBackend, BedrockBackend,
@@ -32,7 +34,8 @@ class ChatBackend(ABC):
         fallback: dict[str, Any],
         json_schema: dict[str, Any] | None = None,
     ) -> ChatResult:
-        """Call the inference endpoint and return (parsed_json, latency_ms).
+        """
+        Call the inference endpoint and return (parsed_json, latency_ms).
 
         On parse failure (after any internal retries), return
         (fallback, latency_ms). Accepts an optional json_schema for

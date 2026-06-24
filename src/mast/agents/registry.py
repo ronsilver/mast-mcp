@@ -1,4 +1,5 @@
-"""Provider registry — maps provider names to ChatBackend implementations.
+"""
+Provider registry — maps provider names to ChatBackend implementations.
 
 Auto-detects provider from available environment credentials.
 Default is ollama.
@@ -61,7 +62,8 @@ def detect_provider() -> str | None:
 
 
 def get_backend(provider: str | None = None) -> ChatBackend:
-    """Return a singleton ChatBackend for the requested provider.
+    """
+    Return a singleton ChatBackend for the requested provider.
 
     Resolution order:
       1. Explicit `provider` argument (if not None).

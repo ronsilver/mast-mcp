@@ -1,4 +1,5 @@
-"""Strategy registry — lookup reasoning modes by name.
+"""
+Strategy registry — lookup reasoning modes by name.
 
 Built-in strategies are registered eagerly on import. External plugins
 are discovered via Python entry points under the
@@ -27,7 +28,8 @@ _strategies: dict[str, object] = {}
 
 
 def register(strategy: object) -> None:
-    """Register a strategy instance.
+    """
+    Register a strategy instance.
 
     Existing entries with the same name take precedence (built-in loaded
     first). Accepts any object exposing a string `name` attribute and a
@@ -47,7 +49,8 @@ def register(strategy: object) -> None:
 
 
 def get(name: str) -> object:
-    """Return the strategy registered under `name`.
+    """
+    Return the strategy registered under `name`.
 
     Raises KeyError if not found.
     """
@@ -143,7 +146,8 @@ def reset() -> None:
 
 # Bootstrap built-in strategies on import.
 def _bootstrap_builtins() -> None:
-    """Register the 9 built-in reasoning modes.
+    """
+    Register the 9 built-in reasoning modes.
 
     Built-ins wrap the existing mode handlers in orchestrator.py and
     agents. They are registered eagerly so external entry points cannot

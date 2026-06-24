@@ -79,7 +79,8 @@ class DebonoOrchestrator:
     """Runs the 7 De Bono hats in sequence, passing a working_document between them."""
 
     def __init__(self, client: ChatBackend) -> None:
-        """Initialize the orchestrator with a ChatBackend instance.
+        """
+        Initialize the orchestrator with a ChatBackend instance.
 
         Args:
             client: Pre-configured ChatBackend instance (e.g. OllamaBackend).
@@ -217,7 +218,8 @@ class DebonoOrchestrator:
         creative_model: str | None = None,
         skip_red: bool | None = None,
     ) -> tuple[DebonoResult, dict[str, Any]]:
-        """Execute the De Bono Six Hats pipeline sequentially.
+        """
+        Execute the De Bono Six Hats pipeline sequentially.
 
         Args:
             thought: The reasoning step to evaluate.

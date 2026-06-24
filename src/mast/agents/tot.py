@@ -125,7 +125,8 @@ class TreeOfThoughtsOrchestrator:
         branches: list[ToTBranch],
         scores: list[dict[str, object]],
     ) -> None:
-        """Map voter scores to branches by explicit `index` field.
+        """
+        Map voter scores to branches by explicit `index` field.
 
         Branches are addressed via their declared `index` rather than
         positional ordering. Scores with an `index` outside the valid
@@ -138,7 +139,7 @@ class TreeOfThoughtsOrchestrator:
                 continue
             raw_score = score_data.get("score", 0.0)
             branches[raw_index].voter_score = (
-                raw_score if isinstance(raw_score, (int, float)) else 0.0
+                raw_score if isinstance(raw_score, int | float) else 0.0
             )
             raw_rationale = score_data.get("rationale", "")
             branches[raw_index].voter_rationale = (

@@ -1,4 +1,5 @@
-"""OpenAI-compatible backend.
+"""
+OpenAI-compatible backend.
 
 Targets `/v1/chat/completions`. Works with OpenAI, vLLM, LM Studio,
 TGI, llama.cpp server, and any other OpenAI-compatible endpoint.

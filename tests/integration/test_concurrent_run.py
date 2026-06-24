@@ -53,7 +53,8 @@ class _TwoStageBackend(ChatBackend):
 
 @pytest.mark.asyncio
 async def test_50_concurrent_runs_no_verdict_crossover() -> None:
-    """Spawn 50 concurrent run() calls with distinct thoughts.
+    """
+    Spawn 50 concurrent run() calls with distinct thoughts.
 
     Each call must receive its own critic + judge response, not a sibling's.
     """

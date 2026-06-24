@@ -43,12 +43,9 @@ If any step fails, fix before proceeding.
 
 ### Permission Boundaries
 
-- **Code changes:** Agent may implement after confirming scope with user (T0 reversible) or after explicit approval (T2+ irreversible).
-- **Configuration changes:** Before modifying environment variables,
-  CI configuration, or project dependencies — confirm with the user.
-- **Deploy/release:** Never push to remote unless the user explicitly confirms they want the agent to push.
-- **Deploy/release:** Output the push command as a copy-pasteable command for the user to run.
-- **Push command:** `git push origin <branch>` — user runs this manually.
+- [CRITICAL] **Code changes:** Agent may implement after confirming scope with user (T0 reversible) or after explicit approval (T2+ irreversible).
+- [IMPORTANT] **Configuration changes:** Before modifying environment variables, CI configuration, or project dependencies — confirm with the user.
+- [CRITICAL] **Deploy/release:** Never push to remote. Output `git push origin <branch>` for the user to run manually. Only push when the user explicitly confirms.
 
 ---
 
@@ -74,7 +71,25 @@ See [docs/strategies.md](docs/strategies.md) for full details on both strategies
 
 When modifying this project, the agent should:
 
-1. **Update README.md** — reflect functional changes, new modes, new env vars, architecture changes.
-2. **Update CHANGELOG.md** — document changes under `[Unreleased]` using Keep a Changelog format.
-3. **Run the full verification chain** before declaring a task complete: lint → typecheck → test.
-4. **Update AGENTS.md** when architecture, strategy, or convention changes.
+1. [RECOMMENDED] **Update README.md** — reflect functional changes, new modes, new env vars, architecture changes.
+2. [IMPORTANT] **Update CHANGELOG.md** — document changes under `[Unreleased]` using Keep a Changelog format.
+3. [CRITICAL] **Run the full verification chain** before declaring a task complete: lint → typecheck → test.
+4. [RECOMMENDED] **Update AGENTS.md** when architecture, strategy, or convention changes.
+
+---
+
+## Tools
+
+- `make check` — lint + format + typecheck + test + mdlint
+- `make coverage` — test coverage gate (≥70%)
+- `make lint` — ruff linting
+- `make format` — ruff format check
+- `make typecheck` — mypy strict type checking
+- `make mdlint` — markdown linting
+- `make test` — pytest with asyncio
+
+## Glossary
+
+- **MAST**: Multi-Agent Sequential Thinking — an active validation layer for LLM reasoning.
+- **MCP**: Model Context Protocol.
+- **PSP**: Payment Service Provider.

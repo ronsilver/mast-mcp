@@ -42,7 +42,8 @@ async def test_retry_increments_temperature_on_parse_failure(
 async def test_fallback_latency_nonzero_after_failures(
     backend: OllamaBackend,
 ) -> None:
-    """After 2 failed attempts, the latency_ms returned with fallback.
+    """
+    After 2 failed attempts, the latency_ms returned with fallback.
 
     Should reflect the time spent, not 0.
     """

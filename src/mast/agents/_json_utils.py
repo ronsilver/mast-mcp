@@ -1,4 +1,5 @@
-"""Shared defensive JSON extraction utilities for all ChatBackend implementations.
+"""
+Shared defensive JSON extraction utilities for all ChatBackend implementations.
 
 Tolerates: <think> blocks, code fences, prose prefixes/suffixes.
 Uses raw_decode so it stops at the first complete JSON object.
@@ -30,7 +31,8 @@ _FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL)
 
 
 def extract_json(text: str) -> dict[str, Any] | None:
-    """Defensively extract first balanced JSON object from arbitrary model output.
+    """
+    Defensively extract first balanced JSON object from arbitrary model output.
 
     Tolerates: <think> blocks, code fences, prose prefixes/suffixes.
     Uses raw_decode so it stops at the first complete JSON object.

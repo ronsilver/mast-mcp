@@ -1,4 +1,5 @@
-"""Canonical tool contract ported 1:1 from upstream sequential-thinking.
+"""
+Canonical tool contract ported 1:1 from upstream sequential-thinking.
 
 Source: modelcontextprotocol/servers/src/sequentialthinking/index.ts
 This module must not contain any MAST-specific logic.

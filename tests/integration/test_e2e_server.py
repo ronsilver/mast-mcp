@@ -1,4 +1,5 @@
-"""End-to-end test of MCP tool dispatch through _call_tool.
+"""
+End-to-end test of MCP tool dispatch through _call_tool.
 
 Exercises the real entry point used by the MCP server without launching
 stdio transport. Validates that tool routing, mode dispatch, the

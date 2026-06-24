@@ -1,4 +1,5 @@
-"""Built-in strategy wrappers.
+"""
+Built-in strategy wrappers.
 
 These delegate to existing mode handlers in agents/* and orchestrator.py.
 A future refactor (post-foundation) will replace the if/elif chain in
@@ -24,7 +25,8 @@ if TYPE_CHECKING:
 
 
 def _make_passthrough(name: str) -> type[Strategy]:
-    """Create a Strategy subclass with a placeholder run().
+    """
+    Create a Strategy subclass with a placeholder run().
 
     The orchestrator currently owns the per-mode logic. These
     placeholder classes exist to register the 9 built-in names in

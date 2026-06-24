@@ -92,7 +92,8 @@ real env > ${VAR} expanded > ${VAR:-default} > literal in file > default
 ```
 
 Config file search order:
-```
+
+```text
 $MAST_CONFIG_FILE > ./mast.toml > ~/.config/mast/config.toml > absent
 ```
 

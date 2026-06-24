@@ -1,4 +1,5 @@
-"""Amazon Bedrock backend — dual auth (iam via boto3, or bearer token via httpx).
+"""
+Amazon Bedrock backend — dual auth (iam via boto3, or bearer token via httpx).
 
 `auth_method=iam` requires `pip install mast-mcp[bedrock]` (installs boto3).
 `auth_method=token` works without boto3 — uses httpx with bearer header.
@@ -170,69 +171,74 @@ class BedrockBackend(ChatBackend):
     ) -> ChatResult:
         m = model or self._default_model
         is_anthropic = _is_anthropic_model(m)
-        body: dict[str, Any]
-        if is_anthropic:
-            body = self._build_anthropic_payload(
-                system_prompt, temperature, num_predict, json_schema
-            )
-        else:
-            body = {
-                "inputText": system_prompt,
-                "textGenerationConfig": {
-                    "temperature": temperature,
-                    "maxTokenCount": num_predict,
-                },
-            }
-
-        content = ""
-        last_latency_ms = 0
+        body = self._build_bedrock_body(m, system_prompt, temperature, num_predict, json_schema)
+        content, last_latency_ms = "", 0
         for attempt in range(2):
             t0 = _time.monotonic()
             try:
-                if self._auth_method == "iam":
-                    raw = await self._invoke_iam(m, body)
-                else:
-                    raw = await self._invoke_token(m, body)
+                raw = await self._invoke_bedrock(m, body)
                 latency_ms = int((_time.monotonic() - t0) * 1000)
                 last_latency_ms = latency_ms
-                if is_anthropic and json_schema is not None:
-                    parsed = self._extract_anthropic_tool_input(raw)
-                    if parsed is not None:
-                        return parsed, latency_ms
-                if is_anthropic:
-                    text_blocks: list[str] = []
-                    for block in raw.get("content", []):
-                        if isinstance(block, dict) and block.get("type") == "text":
-                            text_blocks.append(str(block.get("text", "")))
-                    content = "\n".join(text_blocks)
-                else:
-                    results = raw.get("results", [])
-                    if results:
-                        content = str(results[0].get("outputText", ""))
+                content = self._extract_bedrock_content(raw, is_anthropic, json_schema)
                 if content:
-                    try:
-                        parsed_dict: dict[str, Any] = _json.loads(content)
-                        return parsed_dict, latency_ms
-                    except _json.JSONDecodeError:
-                        extracted = extract_json(content)
-                        if extracted is not None:
-                            return extracted, latency_ms
+                    return _json.loads(content), latency_ms
+            except _json.JSONDecodeError:
+                extracted = extract_json(content)
+                if extracted is not None:
+                    return extracted, last_latency_ms
                 if attempt == 0:
                     continue
-            except (KeyError, IndexError) as exc:
-                latency_ms = int((_time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
-                log.warning("bedrock_response_key_missing", error=str(exc), model=m)
+            except (KeyError, IndexError):
                 if attempt == 0:
                     continue
             except (httpx.HTTPError, RuntimeError) as exc:
-                latency_ms = int((_time.monotonic() - t0) * 1000)
-                last_latency_ms = latency_ms
                 log.error("bedrock_http_error", error=str(exc), model=m)
-                return fallback, latency_ms
-
+                return fallback, last_latency_ms
         log.warning("bedrock_validation_failed_using_fallback", model=m)
         return fallback, last_latency_ms
+
+    def _build_bedrock_body(
+        self,
+        model: str,
+        system_prompt: str,
+        temperature: float,
+        num_predict: int,
+        json_schema: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        if _is_anthropic_model(model):
+            return self._build_anthropic_payload(
+                system_prompt, temperature, num_predict, json_schema
+            )
+        return {
+            "inputText": system_prompt,
+            "textGenerationConfig": {"temperature": temperature, "maxTokenCount": num_predict},
+        }
+
+    async def _invoke_bedrock(self, model: str, body: dict[str, Any]) -> dict[str, Any]:
+        if self._auth_method == "iam":
+            return await self._invoke_iam(model, body)
+        return await self._invoke_token(model, body)
+
+    def _extract_bedrock_content(
+        self, raw: dict[str, Any], is_anthropic: bool, json_schema: dict[str, Any] | None
+    ) -> str:
+        if is_anthropic:
+            return self._extract_anthropic_content(raw, json_schema)
+        results = raw.get("results", [])
+        return str(results[0].get("outputText", "")) if results else ""
+
+    def _extract_anthropic_content(
+        self, raw: dict[str, Any], json_schema: dict[str, Any] | None
+    ) -> str:
+        if json_schema is not None:
+            parsed = self._extract_anthropic_tool_input(raw)
+            if parsed is not None:
+                return _json.dumps(parsed)
+        return "\n".join(
+            str(b.get("text", ""))
+            for b in raw.get("content", [])
+            if isinstance(b, dict) and b.get("type") == "text"
+        )
 
     async def list_models(self) -> list[str]:
         """Use boto3 ListFoundationModels if available, else static catalog."""

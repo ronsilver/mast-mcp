@@ -12,7 +12,8 @@ if TYPE_CHECKING:
 
 
 class Strategy(Protocol):
-    """Pluggable reasoning mode.
+    """
+    Pluggable reasoning mode.
 
     A strategy encapsulates one of the 9 reasoning modes (validate, debate,
     debono, actor_critic, brainstorm, tot, kalman, workflow, passive).
