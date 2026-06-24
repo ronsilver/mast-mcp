@@ -34,9 +34,9 @@ class GitHubBackend(ChatBackend):
         )
 
     def _headers(self) -> dict[str, str]:
-        if not self._api_key:
-            return {}
-        return {"Authorization": f"Bearer {self._api_key}"}
+        from mast.agents._utils import _bearer_headers
+
+        return _bearer_headers(self._api_key)
 
     async def chat(
         self,

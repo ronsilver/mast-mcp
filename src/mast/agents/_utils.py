@@ -102,3 +102,10 @@ def _build_openai_payload(
     else:
         payload["response_format"] = {"type": "json_object"}
     return payload
+
+
+def _bearer_headers(api_key: str | None) -> dict[str, str]:
+    """Build standard Authorization header for OpenAI-compatible backends."""
+    if not api_key:
+        return {}
+    return {"Authorization": f"Bearer {api_key}"}
