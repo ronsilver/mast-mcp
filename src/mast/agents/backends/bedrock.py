@@ -29,6 +29,15 @@ def _is_anthropic_model(model: str) -> bool:
     return "anthropic" in model.lower() or "claude" in model.lower()
 
 
+_BEDROCK_STATIC_MODELS = [
+    "anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "anthropic.claude-3-5-haiku-20241022-v1:0",
+    "amazon.nova-pro-v1:0",
+    "amazon.nova-lite-v1:0",
+    "meta.llama3-1-70b-instruct-v1:0",
+]
+
+
 class BedrockBackend(ChatBackend):
     """Async client for Amazon Bedrock runtime."""
 
