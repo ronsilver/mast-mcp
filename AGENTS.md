@@ -86,15 +86,15 @@ When modifying this project, the agent should:
 
 ## Tools
 
-- [INFO] `make check` — lint + format + typecheck + test + mdlint
-- [INFO] `make coverage` — test coverage gate (≥70%)
-- [INFO] `make lint` — ruff linting
-- [INFO] `make format` — ruff format check
-- [INFO] `make typecheck` — mypy strict type checking
-- [INFO] `make mdlint` — markdown linting
-- [INFO] `make test` — pytest with asyncio
+- `make check` — lint + format + typecheck + test + mdlint
+- `make coverage` — test coverage gate (≥70%)
+- `make lint` — ruff linting
+- `make format` — ruff format check
+- `make typecheck` — mypy strict type checking
+- `make mdlint` — markdown linting
+- `make test` — pytest with asyncio
 
 ## Glossary
 
-- [INFO] **MAST**: Multi-Agent Sequential Thinking — an active validation layer for LLM reasoning.
-- [INFO] **MCP**: Model Context Protocol.
+- **MAST**: Multi-Agent Sequential Thinking — an active validation layer for LLM reasoning.
+- **MCP**: Model Context Protocol.
