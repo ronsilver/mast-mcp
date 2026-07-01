@@ -1,6 +1,6 @@
 # Reasoning Strategies
 
-The MAST-Ollama server supports seven reasoning strategies. The active strategy is
+The MAST-MCP server supports seven reasoning strategies. The active strategy is
 selected via the `MAST_MODE` environment variable.
 
 ---

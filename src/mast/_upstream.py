@@ -1,4 +1,5 @@
-"""Port 1:1 of upstream sequential-thinking TypeScript server logic.
+"""
+Port 1:1 of upstream sequential-thinking TypeScript server logic.
 
 Reference: https://github.com/modelcontextprotocol/servers/tree/main/src/sequentialthinking
 This module must not contain any MAST-specific logic. Keep it as a faithful
@@ -25,6 +26,38 @@ class ThoughtData:
     needs_more_thoughts: bool = False
 
 
+def _require_type(data: dict[str, Any], key: str, expected: type) -> None:
+    if not isinstance(data.get(key), expected):
+        raise ValueError(f"'{key}' must be a {expected.__name__}")
+
+
+def _validate_revises_thought(data: dict[str, Any], history: list[ThoughtData]) -> int | None:
+    revises_thought: int | None = data.get("revisesThought")
+    if revises_thought is not None:
+        existing = {t.thought_number for t in history}
+        if revises_thought not in existing:
+            raise ValueError(
+                f"'revisesThought' #{revises_thought} does not reference an existing thought"
+            )
+    return revises_thought
+
+
+def _validate_branch(
+    data: dict[str, Any], history: list[ThoughtData]
+) -> tuple[str | None, int | None]:
+    branch_id: str | None = data.get("branchId")
+    branch_from_thought: int | None = data.get("branchFromThought")
+    if (branch_id is None) != (branch_from_thought is None):
+        raise ValueError("'branchId' and 'branchFromThought' must both be present or both absent")
+    if branch_from_thought is not None:
+        existing = {t.thought_number for t in history}
+        if branch_from_thought not in existing:
+            raise ValueError(
+                f"'branchFromThought' #{branch_from_thought} does not reference an existing thought"
+            )
+    return branch_id, branch_from_thought
+
+
 @dataclass
 class SequentialThinkingServer:
     """Pure port of upstream SequentialThinkingServer (lib.ts)."""
@@ -47,47 +80,18 @@ class SequentialThinkingServer:
     # ------------------------------------------------------------------
 
     def _validate_input(self, data: dict[str, Any]) -> ThoughtData:
-        if not isinstance(data.get("thought"), str):
-            raise ValueError("'thought' must be a string")
-        if not isinstance(data.get("thoughtNumber"), int):
-            raise ValueError("'thoughtNumber' must be an integer")
-        if not isinstance(data.get("totalThoughts"), int):
-            raise ValueError("'totalThoughts' must be an integer")
-        if not isinstance(data.get("nextThoughtNeeded"), bool):
-            raise ValueError("'nextThoughtNeeded' must be a boolean")
+        _require_type(data, "thought", str)
+        _require_type(data, "thoughtNumber", int)
+        _require_type(data, "totalThoughts", int)
+        _require_type(data, "nextThoughtNeeded", bool)
 
-        revises_thought: int | None = data.get("revisesThought")
-        branch_from_thought: int | None = data.get("branchFromThought")
-        branch_id: str | None = data.get("branchId")
-
-        # Validate that revisesThought references an existing thought
-        if revises_thought is not None:
-            existing = {t.thought_number for t in self.thought_history}
-            if revises_thought not in existing:
-                raise ValueError(
-                    f"'revisesThought' #{revises_thought} does not reference an existing thought"
-                )
-
-        # branchId and branchFromThought must appear together
-        if (branch_id is None) != (branch_from_thought is None):
-            raise ValueError(
-                "'branchId' and 'branchFromThought' must both be present or both absent"
-            )
-
-        # branchFromThought must reference an existing thought
-        if branch_from_thought is not None:
-            existing = {t.thought_number for t in self.thought_history}
-            if branch_from_thought not in existing:
-                raise ValueError(
-                    f"'branchFromThought' #{branch_from_thought} does not reference an existing thought"  # noqa: E501
-                )
+        revises_thought = _validate_revises_thought(data, self.thought_history)
+        branch_id, branch_from_thought = _validate_branch(data, self.thought_history)
 
         thought_number: int = data["thoughtNumber"]
         total_thoughts: int = data["totalThoughts"]
-
-        # Auto-extend totalThoughts when thoughtNumber exceeds it (mirrors upstream)
         if thought_number > total_thoughts:
-            total_thoughts = thought_number
+            total_thoughts = max(total_thoughts, thought_number)
 
         return ThoughtData(
             thought=data["thought"],

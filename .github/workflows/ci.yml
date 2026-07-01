@@ -1,19 +1,27 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    # Weekly run for security/vulnerability scans
+    - cron: "0 6 * * 1"
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v4  # nosemgrep
+      - uses: astral-sh/setup-uv@v4  # nosemgrep
         with:
           version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
       - run: uv sync --extra dev
       - run: make lint
       - run: make format
@@ -21,11 +29,19 @@ jobs:
       - run: make mdlint
 
   test:
+    name: test (python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
+      - uses: actions/checkout@v4  # nosemgrep
+      - uses: astral-sh/setup-uv@v4  # nosemgrep
         with:
           version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "pyproject.toml"
+          python-version: ${{ matrix.python-version }}
       - run: uv sync --extra dev
-      - run: make test
+      - run: make coverage

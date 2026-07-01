@@ -1,0 +1,202 @@
+# =============================================================================
+# MAST-MCP Configuration File — EXAMPLE (copy to mast.toml and edit)
+# =============================================================================
+# Search order (first found wins):
+#   $MAST_CONFIG_FILE > ./mast.toml > ~/.config/mast/config.toml > absent
+#
+# Precedence (highest to lowest within a field):
+#   1. Real env var set directly (e.g. OPENAI_API_KEY=x in shell)
+#   2. ${VAR} expansion in this file (env var must be set)
+#   3. ${VAR:-default} expansion (default if env var unset/empty)
+#   4. Literal value in this file (e.g. "sk-xxx")
+#   5. Built-in code default
+#
+# ${VAR} syntax:
+#   ${VAR}          — replaced by env var value; error if unset (fail fast)
+#   ${VAR:-default} — default if env var unset OR empty
+#
+# Credentials: NEVER hardcode in source. Use this file (gitignored) with
+#   ${VAR} expansion, OR env vars directly. Both approaches supported.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Provider selection + credentials
+# -----------------------------------------------------------------------------
+[provider]
+# Active provider. One of:
+#   ollama | openai | anthropic | gemini | bedrock | github | openrouter
+# If absent, auto-detect from available credentials.
+default = "ollama"                    # or ${MAST_PROVIDER:-ollama}
+
+
+# --- Ollama (local or Ollama Cloud) -----------------------------------------
+[provider.ollama]
+base_url = "http://localhost:11434"   # or ${OLLAMA_BASE_URL:-http://localhost:11434}
+# For Ollama Cloud:
+#   base_url = "https://ollama.com/api"
+#   api_key  = ${OLLAMA_CLOUD_API_KEY}
+# api_key = ""
+
+
+# --- OpenAI-compatible (OpenAI, vLLM, LM Studio, TGI) -----------------------
+[provider.openai]
+# api_key  = "sk-xxx"
+# api_key  = ${OPENAI_API_KEY}
+# api_key  = ${OPENAI_API_KEY:-sk-xxx}
+# base_url = ${MAST_BASE_URL:-https://api.openai.com/v1}
+
+
+# --- Anthropic -------------------------------------------------------------
+[provider.anthropic]
+# api_key = "sk-ant-xxx"
+# api_key = ${ANTHROPIC_API_KEY}
+# api_key = ${ANTHROPIC_API_KEY:-sk-ant-xxx}
+
+
+# --- Google Gemini ---------------------------------------------------------
+[provider.gemini]
+# api_key = ${GEMINI_API_KEY}
+
+
+# --- Amazon Bedrock --------------------------------------------------------
+[provider.bedrock]
+auth_method = "iam"                   # or ${BEDROCK_AUTH_METHOD:-iam}
+region = "us-east-1"                  # or ${AWS_REGION:-us-east-1}
+# profile = ${AWS_PROFILE:-default}
+# token = ${BEDROCK_TOKEN}                       # token only — bearer auth
+# access_key_id     = ${AWS_ACCESS_KEY_ID}       # iam only
+# secret_access_key = ${AWS_SECRET_ACCESS_KEY}   # iam only
+# session_token     = ${AWS_SESSION_TOKEN}       # iam only, optional
+
+
+# --- GitHub Models (OpenAI-compatible) --------------------------------------
+[provider.github]
+# token = ${GITHUB_TOKEN}
+
+
+# --- OpenRouter (OpenAI-compatible, multi-model routing) --------------------
+[provider.openrouter]
+# api_key = ${OPENROUTER_API_KEY}
+
+
+# -----------------------------------------------------------------------------
+# Strategy / mode selection
+# -----------------------------------------------------------------------------
+[strategy]
+# Default reasoning mode. One of:
+#   passive | validate | debate | debono | actor_critic | brainstorm | tot | kalman | workflow
+default = "debate"                    # or ${MAST_MODE:-debate}
+
+# Directory with custom strategy plugins (auto-discovered at startup).
+# Each .py file must define a Strategy subclass or a register(registry) hook.
+# Built-in modes take precedence on name conflict (warning logged).
+dir = "~/.config/mast/strategies"     # or ${MAST_STRATEGY_DIR:-~/.config/mast/strategies}
+
+
+# -----------------------------------------------------------------------------
+# Agent models (role-based, shared across modes)
+# -----------------------------------------------------------------------------
+[agents]
+critic_model = "mistral:7b-instruct"  # or ${CRITIC_MODEL:-mistral:7b-instruct}
+judge_model  = "deepseek-r1:8b"       # or ${JUDGE_MODEL:-deepseek-r1:8b}
+
+
+# -----------------------------------------------------------------------------
+# Mode-specific configuration
+# -----------------------------------------------------------------------------
+
+# --- De Bono Six Thinking Hats ----------------------------------------------
+[modes.debono]
+blue_open_model   = "qwen2.5:3b"     # or ${DEBONO_BLUE_OPEN_MODEL:-qwen2.5:3b}
+white_model       = "qwen2.5:3b"     # or ${DEBONO_WHITE_MODEL:-qwen2.5:3b}
+green_model       = "qwen2.5:1.5b"   # or ${DEBONO_GREEN_MODEL:-qwen2.5:1.5b}
+yellow_model      = "qwen2.5:3b"     # or ${DEBONO_YELLOW_MODEL:-qwen2.5:3b}
+black_model       = "qwen2.5:3b"     # or ${DEBONO_BLACK_MODEL:-qwen2.5:3b}
+red_model         = "qwen2.5:1.5b"   # or ${DEBONO_RED_MODEL:-qwen2.5:1.5b}
+blue_close_model  = "qwen2.5:3b"     # or ${DEBONO_BLUE_CLOSE_MODEL:-qwen2.5:3b}
+skip_red          = false            # or ${DEBONO_SKIP_RED:-false}
+
+
+# --- Actor-Critic iterative refinement --------------------------------------
+[modes.actor_critic]
+max_rounds = 3                        # or ${ACTOR_CRITIC_MAX_ROUNDS:-3}
+
+
+# --- Brainstorm (parallel divergence + synthesis) ---------------------------
+[modes.brainstorm]
+# Comma-separated generator models (divergent phase, temperature=0.85)
+models      = "llama3:8b,mistral:7b"  # or ${BRAINSTORM_MODELS:-llama3:8b,mistral:7b}
+synth_model = "qwen2.5:14b"           # or ${BRAINSTORM_SYNTH_MODEL:-qwen2.5:14b}
+
+
+# --- Tree of Thoughts (branch generation + voting) --------------------------
+[modes.tot]
+# Comma-separated branch generators (temperature=0.75)
+branch_models = "llama3:8b,mistral:7b,qwen2.5:7b"  # or ${TOT_BRANCH_MODELS:-llama3:8b,mistral:7b,qwen2.5:7b}
+voter_model   = "deepseek-r1:8b"                   # or ${TOT_VOTER_MODEL:-deepseek-r1:8b}
+
+
+# --- Kalman Convergence (Bayesian fusion) -----------------------------------
+[modes.kalman]
+# Comma-separated scorer models (temperature=0.1, deterministic)
+scorer_models    = "mistral:7b,qwen2.5:7b,phi3:mini"  # or ${KALMAN_SCORER_MODELS:-mistral:7b,qwen2.5:7b,phi3:mini}
+p_threshold      = 0.18     # or ${KALMAN_P_THRESHOLD:-0.18}
+accept_threshold = 0.70     # or ${KALMAN_ACCEPT_THRESHOLD:-0.70}
+
+
+# --- Workflow (chain modes in sequence) -------------------------------------
+[modes.workflow]
+# Comma-separated modes executed in order.
+# Presets (uncomment one):
+#   stages = "actor_critic,kalman"                  # deep-think
+#   stages = "brainstorm,actor_critic"              # creative
+#   stages = "brainstorm,actor_critic,tot,kalman"   # overanalyze
+#   stages = "brainstorm,tot,actor_critic,kalman"   # architecture
+stages = "debate,kalman"            # or ${MAST_WORKFLOW_STAGES:-debate,kalman}
+
+
+# -----------------------------------------------------------------------------
+# Server / behavior tuning
+# -----------------------------------------------------------------------------
+[server]
+timeout_ms            = 15000       # or ${MAST_TIMEOUT_MS:-15000}
+cache_ttl_s           = 300         # or ${MAST_CACHE_TTL_S:-300}
+max_history           = 50          # or ${MAST_MAX_HISTORY:-50}
+history_window        = 3           # or ${MAST_HISTORY_WINDOW:-3}
+history_max_tokens    = 1500        # or ${MAST_HISTORY_MAX_TOKENS:-1500}
+skip_threshold_chars  = 20          # or ${MAST_SKIP_THRESHOLD_CHARS:-20}
+log_level             = "INFO"      # or ${MAST_LOG_LEVEL:-INFO}
+disable_thought_logging = false     # or ${DISABLE_THOUGHT_LOGGING:-false}
+color_thoughts        = false       # or ${MAST_COLOR_THOUGHTS:-false}
+format_mode           = "schema"    # or ${MAST_FORMAT_MODE:-schema}
+
+
+# -----------------------------------------------------------------------------
+# MCP client config (claude_desktop_config.json) — env vars only
+# -----------------------------------------------------------------------------
+# If you prefer env vars over a config file:
+# {
+#   "mcpServers": {
+#     "mast-mcp": {
+#       "command": "uvx",
+#       "args": ["mast-mcp"],
+#       "env": {
+#         "MAST_PROVIDER": "openai",
+#         "OPENAI_API_KEY": "sk-xxx",
+#         "CRITIC_MODEL": "gpt-4o-mini",
+#         "JUDGE_MODEL": "gpt-4o-mini",
+#         "MAST_MODE": "debate"
+#       }
+#     }
+#   }
+# }
+
+
+# -----------------------------------------------------------------------------
+# Notes
+# -----------------------------------------------------------------------------
+# - Precedence: real env vars > ${VAR} expansion in this file > literal defaults.
+# - ${VAR} without :- and var unset → load error (fail fast, actionable msg).
+# - ${VAR:-default} → uses default if var unset OR empty.
+# - NEVER commit mast.toml with real credentials. It is gitignored by default.

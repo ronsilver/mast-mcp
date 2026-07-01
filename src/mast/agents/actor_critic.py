@@ -6,13 +6,14 @@ from dataclasses import dataclass
 
 import structlog
 
-from mast.agents.base import OllamaClient
 from mast.agents.critic import CriticAgent
 from mast.agents.judge import JudgeAgent
+from mast.agents.protocols import ChatBackend
 from mast.config import config
 from mast.validation.schemas import (
     ActorCriticResult,
     ActorCriticRound,
+    CriticResponse,
     IssueSeverity,
     Verdict,
 )
@@ -29,13 +30,100 @@ class _RoundResult:
     final: bool = False
 
 
+@dataclass
+class _RoundCtx:
+    thought: str
+    thought_number: int
+    total_thoughts: int
+    history_summary: str
+    round_idx: int
+    critic_model: str | None = None
+    judge_model: str | None = None
+
+
 class ActorCriticOrchestrator:
     """Iterative Critic+Judge refinement loop until convergence."""
 
-    def __init__(self, client: OllamaClient) -> None:
+    def __init__(self, client: ChatBackend) -> None:
         """Initialize with CriticAgent and JudgeAgent wrapping the given client."""
         self._critic = CriticAgent(client)
         self._judge = JudgeAgent(client)
+
+    async def _run_critic_round(
+        self,
+        ctx: _RoundCtx,
+    ) -> tuple[_RoundResult | None, CriticResponse | None, int]:
+        from mast.agents.critic import CritiqueRequest
+
+        critic_resp, c_lat = await self._critic.critique(
+            CritiqueRequest(
+                thought=ctx.thought,
+                thought_number=ctx.thought_number,
+                total_thoughts=ctx.total_thoughts,
+                history_summary=ctx.history_summary,
+                model=ctx.critic_model,
+            )
+        )
+        needs_revision = any(i.severity in _ESCALATE_SEVERITIES for i in critic_resp.issues)
+        if not needs_revision:
+            return (
+                _RoundResult(
+                    validated_round=ActorCriticRound.model_validate(
+                        {
+                            "round": ctx.round_idx,
+                            "thought": ctx.thought,
+                            "critic": critic_resp,
+                            "verdict": "accept",
+                            "criticLatencyMs": c_lat,
+                            "judgeLatencyMs": 0,
+                        }
+                    ),
+                    final=True,
+                ),
+                None,
+                0,
+            )
+        return None, critic_resp, c_lat
+
+    async def _run_judge_round(
+        self,
+        ctx: _RoundCtx,
+        critic_resp: CriticResponse,
+        c_lat: int,
+    ) -> _RoundResult:
+        from mast.agents.judge import JudgeRequest
+
+        judge_resp, j_lat = await self._judge.judge(
+            JudgeRequest(
+                thought=ctx.thought,
+                thought_number=ctx.thought_number,
+                total_thoughts=ctx.total_thoughts,
+                history_summary=ctx.history_summary,
+                critique=critic_resp,
+                mode="actor_critic",
+                model=ctx.judge_model,
+            )
+        )
+        next_thought = (
+            judge_resp.suggested_revision
+            if (judge_resp.suggested_revision and judge_resp.verdict != Verdict.REJECT)
+            else None
+        )
+        return _RoundResult(
+            validated_round=ActorCriticRound.model_validate(
+                {
+                    "round": ctx.round_idx,
+                    "thought": ctx.thought,
+                    "critic": critic_resp,
+                    "verdict": judge_resp.verdict.value,
+                    "suggestedRevision": judge_resp.suggested_revision,
+                    "criticLatencyMs": c_lat,
+                    "judgeLatencyMs": j_lat,
+                }
+            ),
+            next_thought=next_thought,
+            final=next_thought is None,
+        )
 
     async def _run_round(
         self,
@@ -47,57 +135,21 @@ class ActorCriticOrchestrator:
         critic_model: str | None = None,
         judge_model: str | None = None,
     ) -> _RoundResult:
-        critic_resp, c_lat = await self._critic.critique(
+        ctx = _RoundCtx(
             thought=thought,
             thought_number=thought_number,
             total_thoughts=total_thoughts,
             history_summary=history_summary,
-            model=critic_model,
+            round_idx=round_idx,
+            critic_model=critic_model,
+            judge_model=judge_model,
         )
-        needs_revision = any(i.severity in _ESCALATE_SEVERITIES for i in critic_resp.issues)
-        if not needs_revision:
-            return _RoundResult(
-                validated_round=ActorCriticRound.model_validate(
-                    {
-                        "round": round_idx,
-                        "thought": thought,
-                        "critic": critic_resp,
-                        "verdict": "accept",
-                        "criticLatencyMs": c_lat,
-                        "judgeLatencyMs": 0,
-                    }
-                ),
-                final=True,
-            )
-        judge_resp, j_lat = await self._judge.judge(
-            thought=thought,
-            thought_number=thought_number,
-            total_thoughts=total_thoughts,
-            history_summary=history_summary,
-            critique=critic_resp,
-            mode="actor_critic",
-            model=judge_model,
-        )
-        next_thought = (
-            judge_resp.suggested_revision
-            if (judge_resp.suggested_revision and judge_resp.verdict != Verdict.REJECT)
-            else None
-        )
-        return _RoundResult(
-            validated_round=ActorCriticRound.model_validate(
-                {
-                    "round": round_idx,
-                    "thought": thought,
-                    "critic": critic_resp,
-                    "verdict": judge_resp.verdict.value,
-                    "suggestedRevision": judge_resp.suggested_revision,
-                    "criticLatencyMs": c_lat,
-                    "judgeLatencyMs": j_lat,
-                }
-            ),
-            next_thought=next_thought,
-            final=next_thought is None,
-        )
+        result, critic_resp, c_lat = await self._run_critic_round(ctx)
+        if result is not None:
+            return result
+        if critic_resp is None:
+            raise RuntimeError("critic_resp must not be None when result is None")
+        return await self._run_judge_round(ctx, critic_resp, c_lat)
 
     async def run(
         self,

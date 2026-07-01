@@ -31,6 +31,8 @@ from mast.agents.critic import CriticAgent
 from mast.agents.judge import JudgeAgent
 from mast.config import config
 
+_TIMESTAMP_FMT = "%Y%m%dT%H%M%SZ"
+
 
 def _parse_models(flag: str | None, env_key: str, fallback: str) -> list[str]:
     if flag:
@@ -45,6 +47,59 @@ def _sanitize(name: str) -> str:
     return re.sub(r"[:/\\]", "_", name)
 
 
+async def _eval_item(
+    item: dict[str, object],
+    critic: CriticAgent,
+    judge: JudgeAgent,
+    critic_model: str,
+    judge_model: str,
+) -> dict[str, object]:
+    thought: str = str(item["thought"])
+    history: str = str(item.get("history_summary", "(no previous thoughts)"))
+    expected_verdict: str = str(item.get("expected_verdict", ""))
+    expected_types: list[str] = list(item.get("expected_issue_types", []))  # type: ignore[arg-type]
+
+    t0 = time.monotonic()
+    critic_resp, critic_ms = await critic.critique(
+        thought=thought,
+        thought_number=1,
+        total_thoughts=1,
+        history_summary=history,
+        model=critic_model,
+    )
+    judge_resp, judge_ms = await judge.judge(
+        thought=thought,
+        thought_number=1,
+        total_thoughts=1,
+        history_summary=history,
+        critique=critic_resp,
+        mode="debate",
+        model=judge_model,
+    )
+    total_ms = int((time.monotonic() - t0) * 1000)
+    actual_verdict = judge_resp.verdict.value
+    actual_types = [i.type.value for i in critic_resp.issues]
+    verdict_correct = actual_verdict == expected_verdict
+    missing_types = [t for t in expected_types if t not in actual_types]
+
+    return {
+        "id": item.get("id"),
+        "expected_verdict": expected_verdict,
+        "actual_verdict": actual_verdict,
+        "verdict_correct": verdict_correct,
+        "expected_issue_types": expected_types,
+        "actual_issue_types": actual_types,
+        "missing_types": missing_types,
+        "critic_used_fallback": critic_resp.summary == "validation_failed",
+        "judge_used_fallback": judge_resp.rationale == "validation_failed",
+        "critic_ms": critic_ms,
+        "judge_ms": judge_ms,
+        "total_ms": total_ms,
+        "confidence": judge_resp.confidence,
+        "n_issues": len(critic_resp.issues),
+    }
+
+
 async def _eval_pair(
     dataset: list[dict[str, object]],
     critic_model: str,
@@ -55,7 +110,7 @@ async def _eval_pair(
     critic = CriticAgent(client)
     judge = JudgeAgent(client)
 
-    ts = datetime.datetime.now(tz=datetime.UTC).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.datetime.now(tz=datetime.UTC).strftime(_TIMESTAMP_FMT)  # nosemgrep
     out_path = output_dir / _sanitize(critic_model) / _sanitize(judge_model) / f"{ts}.jsonl"
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -63,63 +118,13 @@ async def _eval_pair(
 
     with out_path.open("w", encoding="utf-8") as fh:
         for item in dataset:
-            thought: str = str(item["thought"])
-            history: str = str(item.get("history_summary", "(no previous thoughts)"))
-            expected_verdict: str = str(item.get("expected_verdict", ""))
-            expected_types: list[str] = list(item.get("expected_issue_types", []))  # type: ignore[arg-type]
-
-            t0 = time.monotonic()
-
-            # --- Critic ---
-            critic_resp, critic_ms = await critic.critique(
-                thought=thought,
-                thought_number=1,
-                total_thoughts=1,
-                history_summary=history,
-                model=critic_model,
-            )
-
-            # --- Judge ---
-            judge_resp, judge_ms = await judge.judge(
-                thought=thought,
-                thought_number=1,
-                total_thoughts=1,
-                history_summary=history,
-                critique=critic_resp,
-                mode="debate",
-                model=judge_model,
-            )
-
-            total_ms = int((time.monotonic() - t0) * 1000)
-            actual_verdict = judge_resp.verdict.value
-            actual_types = [i.type.value for i in critic_resp.issues]
-
-            verdict_correct = actual_verdict == expected_verdict
-            missing_types = [t for t in expected_types if t not in actual_types]
-
-            record = {
-                "id": item.get("id"),
-                "expected_verdict": expected_verdict,
-                "actual_verdict": actual_verdict,
-                "verdict_correct": verdict_correct,
-                "expected_issue_types": expected_types,
-                "actual_issue_types": actual_types,
-                "missing_types": missing_types,
-                "critic_used_fallback": critic_resp.summary == "validation_failed",
-                "judge_used_fallback": judge_resp.rationale == "validation_failed",
-                "critic_ms": critic_ms,
-                "judge_ms": judge_ms,
-                "total_ms": total_ms,
-                "confidence": judge_resp.confidence,
-                "n_issues": len(critic_resp.issues),
-            }
+            record = await _eval_item(item, critic, judge, critic_model, judge_model)
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
-
-            status = "✓" if verdict_correct else "✗"
+            status = "✓" if record["verdict_correct"] else "✗"
             print(
                 f"  {status} {item.get('id'):<35} "
-                f"exp={expected_verdict:<7} got={actual_verdict:<7} "
-                f"{total_ms}ms",
+                f"exp={record['expected_verdict']:<7} got={record['actual_verdict']:<7} "
+                f"{record['total_ms']}ms",
                 flush=True,
             )
 

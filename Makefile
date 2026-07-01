@@ -4,7 +4,7 @@ test:
 	uv run pytest tests/unit/ tests/integration/ -v --tb=short
 
 coverage:
-	uv run pytest tests/unit/ tests/integration/ --cov=src/mast --cov-report=term-missing --cov-report=html:.coverage_html -v --tb=short
+	uv run pytest tests/unit/ tests/integration/ --cov=src/mast --cov-report=term-missing --cov-report=html:.coverage_html --cov-fail-under=70 -v --tb=short
 
 lint:
 	uv run ruff check src/ tests/ evals/

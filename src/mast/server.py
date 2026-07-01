@@ -24,7 +24,7 @@ from mast.validation.schemas import SequentialThinkingInput
 
 log = structlog.get_logger(__name__)
 
-server = Server("mast-ollama")
+server = Server("mast-mcp")
 
 
 # ---------------------------------------------------------------------------
@@ -60,13 +60,14 @@ async def _call_tool(name: str, arguments: dict[str, Any]) -> list[TextContent]:
         judge_model = arguments.pop("judgeModel", None)
         debono_primary = arguments.pop("debonoPrimaryModel", None)
         debono_creative = arguments.pop("debonoCreativeModel", None)
-        user_mode = arguments.get("mode") or config.mast_mode
-        force_mode = "debate" if user_mode == "debate" else user_mode
+        # mast_debate defaults to "debate" if the client did not pass mode,
+        # unlike sequentialthinking which uses config.mast_mode.
+        user_mode = arguments.get("mode") or "debate"
         result = await _handle_thought(
             arguments,
             upstream=upstream,
             orchestrator=orchestrator,
-            force_mode=force_mode,
+            force_mode=user_mode,
             critic_model=critic_model or debono_primary,
             judge_model=judge_model or debono_creative,
         )
@@ -101,6 +102,20 @@ def _get_orchestrator() -> ValidationOrchestrator:
 # ---------------------------------------------------------------------------
 
 
+def _build_thought_obj(parsed: SequentialThinkingInput) -> ThoughtData:
+    return ThoughtData(
+        thought=parsed.thought,
+        thought_number=parsed.thought_number,
+        total_thoughts=parsed.total_thoughts,
+        next_thought_needed=parsed.next_thought_needed,
+        is_revision=parsed.is_revision or False,
+        revises_thought=parsed.revises_thought,
+        branch_from_thought=parsed.branch_from_thought,
+        branch_id=parsed.branch_id,
+        needs_more_thoughts=parsed.needs_more_thoughts or False,
+    )
+
+
 async def _handle_thought(
     raw_input: dict[str, Any],
     *,
@@ -116,18 +131,7 @@ async def _handle_thought(
     mode = force_mode or parsed.mode or config.mast_mode
 
     upstream_response = upstream.process_thought(raw_input)
-
-    thought_obj = ThoughtData(
-        thought=parsed.thought,
-        thought_number=parsed.thought_number,
-        total_thoughts=parsed.total_thoughts,
-        next_thought_needed=parsed.next_thought_needed,
-        is_revision=parsed.is_revision or False,
-        revises_thought=parsed.revises_thought,
-        branch_from_thought=parsed.branch_from_thought,
-        branch_id=parsed.branch_id,
-        needs_more_thoughts=parsed.needs_more_thoughts or False,
-    )
+    thought_obj = _build_thought_obj(parsed)
 
     if not config.disable_thought_logging:
         formatted = upstream.format_thought(thought_obj)

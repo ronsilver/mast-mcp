@@ -1,0 +1,22 @@
+---
+strictness: medium
+doc-warnings: false
+test-warnings: false
+
+pydocstyle:
+  disable:
+    - D212  # contradicts D213 (summary on first vs second line)
+    - D203  # "blank line before class docstring" contradicts D211, unusual style
+
+pycodestyle:
+  disable:
+    - E704  # false positive on Protocol method stubs (def + ... on next line)
+
+pylint:
+  disable:
+    - R0913  # too-many-arguments (intentional for backend chat() signatures)
+    - R0917  # too-many-positional-arguments
+    - C0415  # import-outside-toplevel (lazy imports for circular dep avoidance)
+    - R0914  # too-many-locals
+    - W2301  # unnecessary-ellipsis (Protocol stubs)
+    - W0212  # protected-access (access to _http, _critic, etc.)

@@ -1,6 +1,6 @@
 # Roadmap
 
-Forward-looking feature proposals for MAST-Ollama, ordered by community impact.
+Forward-looking feature proposals for MAST-MCP, ordered by community impact.
 Each item is written to be directly convertible into a GitHub issue (motivation,
 scope, acceptance criteria). Contributions welcome — see the labels at the bottom.
 
@@ -10,7 +10,7 @@ scope, acceptance criteria). Contributions welcome — see the labels at the bot
 
 ## P0 — Highest leverage
 
-### 1. 🔴 Distribution: PyPI + MCP Registry + Docker image
+### 1. 🟡 Distribution: PyPI + MCP Registry + Docker image
 
 **Motivation.** The only documented install today is `uvx --from git+https://…`,
 which limits discovery to people who already know the repo. Publishing to PyPI and
@@ -19,23 +19,26 @@ downstream registries, with updates propagating automatically on each tagged rel
 
 **Scope.**
 
-- Publish the package to PyPI so `uvx mast-ollama` / `pipx install mast-ollama` work.
-- Add a `server.json` (namespace `io.github.ronsilver/mast-ollama`) and a release
+- Publish the package to PyPI so `uvx mast-mcp` / `pipx install mast-mcp` work.
+- Add a `server.json` (namespace `io.github.ronsilver/mast-mcp`) and a release
   workflow that publishes to the MCP Registry via the MCP Publisher CLI using GitHub
   Actions OIDC, triggered on `v*` tags.
-- Build and push a container image to `ghcr.io/ronsilver/mast-ollama` for users who
+- Build and push a container image to `ghcr.io/ronsilver/mast-mcp` for users who
   run MCP servers in containers.
 
 **Acceptance criteria.**
 
-- `uvx mast-ollama` runs the server from PyPI with no `--from` flag.
+- `uvx mast-mcp` runs the server from PyPI with no `--from` flag.
 - The server appears in the MCP Registry under the `io.github.ronsilver` namespace.
-- `docker run ghcr.io/ronsilver/mast-ollama --doctor` works against a reachable Ollama.
+- `docker run ghcr.io/ronsilver/mast-mcp --doctor` works against a reachable Ollama.
 - A tagged release triggers PyPI publish + registry publish + image push automatically.
+
+**Status.** 🟡 Code complete locally. Requires user to tag `v0.3.0`, push, and
+create the release workflow. See TODO.md T18 for manual steps.
 
 ---
 
-### 2. 🔴 OpenAI-compatible backend (not only Ollama)
+### 2. 🟢 OpenAI-compatible backend (not only Ollama)
 
 **Motivation.** `agents/base.py` is hardcoded to Ollama's `/api/chat`. The core value
 of MAST — multi-model adversarial validation — generalizes to any inference backend.
@@ -47,7 +50,7 @@ addressable audience without changing the validation logic.
 
 - Introduce a `ChatBackend` protocol and refactor `OllamaClient` to implement it.
 - Add an `OpenAICompatBackend` that targets `/v1/chat/completions`.
-- Select backend via env (`MAST_BACKEND=ollama|openai`), keeping Ollama the default.
+- Select backend via env (`MAST_PROVIDER=ollama|openai|...`), keeping Ollama the default.
 - Map the structured-output `format` parameter to each backend's JSON-mode equivalent.
 
 **Acceptance criteria.**
@@ -56,9 +59,12 @@ addressable audience without changing the validation logic.
 - `--doctor` validates connectivity and model availability for the selected backend.
 - No behavioral change for existing Ollama users (default path is byte-for-byte equal).
 
+**Status.** 🟢 Implemented. 7 backends: Ollama, OpenAI, Anthropic, Gemini, Bedrock
+(iam+token), GitHub Models, OpenRouter. See `docs/adr/0001-provider-abstraction.md`.
+
 ---
 
-### 3. 🔴 Strategy registry / plugin system
+### 3. 🟢 Strategy registry / plugin system
 
 **Motivation.** The orchestrator dispatches modes through a long `if/elif` chain
 (`validation/orchestrator.py`, ~lines 178–401). Because MAST is fundamentally a
@@ -79,6 +85,11 @@ the code review.
 - Adding a new mode requires no edit to `orchestrator.run()`.
 - A separate pip package can register a strategy discovered at startup.
 - All existing modes are migrated to the registry with no output changes.
+
+**Status.** 🟢 Strategy Protocol + Registry + entry-point loader + `MAST_STRATEGY_DIR`
+local loader implemented. 9 built-in modes registered. Orchestrator dispatch
+migration to registry lookup deferred to next iteration (current if/elif chain
+preserved for stability).
 
 ---
 

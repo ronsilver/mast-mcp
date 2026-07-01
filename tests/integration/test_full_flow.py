@@ -68,12 +68,16 @@ async def test_critic_agent_full_flow(
         return_value=httpx.Response(200, json=_mock_chat_response(CRITIC_JSON))
     )
 
+    from mast.agents.critic import CritiqueRequest
+
     agent = CriticAgent(ollama_client)
     result, latency_ms = await agent.critique(
-        thought="Use Redis for session caching",
-        thought_number=2,
-        total_thoughts=5,
-        history_summary="#1: Define the problem scope",
+        CritiqueRequest(
+            thought="Use Redis for session caching",
+            thought_number=2,
+            total_thoughts=5,
+            history_summary="#1: Define the problem scope",
+        )
     )
 
     assert len(result.issues) == 1
@@ -99,14 +103,18 @@ async def test_judge_agent_full_flow(
         summary="One issue",
     )
 
+    from mast.agents.judge import JudgeRequest
+
     agent = JudgeAgent(ollama_client)
-    result, latency_ms = await agent.judge(
-        thought="Use Redis for session caching",
-        thought_number=2,
-        total_thoughts=5,
-        history_summary="#1: Define scope",
-        critique=critic_resp,
-        mode="debate",
+    result, _ = await agent.judge(
+        JudgeRequest(
+            thought="Use Redis for session caching",
+            thought_number=2,
+            total_thoughts=5,
+            history_summary="#1: Define scope",
+            critique=critic_resp,
+            mode="debate",
+        )
     )
 
     assert result.verdict == Verdict.REVISE
@@ -122,12 +130,16 @@ async def _run_fallback_test(
     """Run a critique with a mock side_effect and assert fallback behavior."""
     mock_ollama.post("/api/chat").mock(side_effect=side_effect)
 
+    from mast.agents.critic import CritiqueRequest
+
     agent = CriticAgent(ollama_client)
     result, _ = await agent.critique(
-        thought="Some thought",
-        thought_number=1,
-        total_thoughts=1,
-        history_summary="",
+        CritiqueRequest(
+            thought="Some thought",
+            thought_number=1,
+            total_thoughts=1,
+            history_summary="",
+        )
     )
     assert result.issues == []
     await ollama_client.aclose()
@@ -166,12 +178,16 @@ async def test_ollama_cloud_auth_header() -> None:
             mock.post("/api/chat").mock(
                 return_value=httpx.Response(200, json=_mock_chat_response(CRITIC_JSON))
             )
+            from mast.agents.critic import CritiqueRequest
+
             agent = CriticAgent(client)
             result, _ = await agent.critique(
-                thought="Test cloud auth",
-                thought_number=1,
-                total_thoughts=1,
-                history_summary="",
+                CritiqueRequest(
+                    thought="Test cloud auth",
+                    thought_number=1,
+                    total_thoughts=1,
+                    history_summary="",
+                )
             )
             assert len(result.issues) == 1
             assert mock.calls.last is not None

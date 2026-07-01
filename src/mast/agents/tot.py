@@ -8,7 +8,7 @@ import jinja2
 import structlog
 
 from mast.agents._utils import load_prompt
-from mast.agents.base import OllamaClient
+from mast.agents.protocols import ChatBackend
 from mast.config import config
 from mast.validation.schemas import ToTBranch, ToTResult
 
@@ -18,7 +18,7 @@ log = structlog.get_logger(__name__)
 class TreeOfThoughtsOrchestrator:
     """Parallel branch generation and voting orchestrator."""
 
-    def __init__(self, client: OllamaClient) -> None:
+    def __init__(self, client: ChatBackend) -> None:
         """Initialize with Ollama client and load prompt templates."""
         self._client = client
         self._branch_tpl = jinja2.Template(
@@ -125,11 +125,23 @@ class TreeOfThoughtsOrchestrator:
         branches: list[ToTBranch],
         scores: list[dict[str, object]],
     ) -> None:
-        for i, score_data in enumerate(scores):
-            if i < len(branches):
-                raw_score = score_data.get("score", 0.0)
-                branches[i].voter_score = raw_score if isinstance(raw_score, int | float) else 0.0
-                raw_rationale = score_data.get("rationale", "")
-                branches[i].voter_rationale = (
-                    str(raw_rationale) if raw_rationale is not None else ""
-                )
+        """
+        Map voter scores to branches by explicit `index` field.
+
+        Branches are addressed via their declared `index` rather than
+        positional ordering. Scores with an `index` outside the valid
+        range or missing `index` are ignored (unscored branches sort
+        to the bottom by default sort with `or 0`).
+        """
+        for score_data in scores:
+            raw_index = score_data.get("index")
+            if not isinstance(raw_index, int) or raw_index < 0 or raw_index >= len(branches):
+                continue
+            raw_score = score_data.get("score", 0.0)
+            branches[raw_index].voter_score = (
+                raw_score if isinstance(raw_score, int | float) else 0.0
+            )
+            raw_rationale = score_data.get("rationale", "")
+            branches[raw_index].voter_rationale = (
+                str(raw_rationale) if raw_rationale is not None else ""
+            )

@@ -9,7 +9,7 @@ import jinja2
 import structlog
 
 from mast.agents._utils import load_prompt
-from mast.agents.base import OllamaClient
+from mast.agents.protocols import ChatBackend
 from mast.config import config
 from mast.validation.schemas import KalmanResult, KalmanScoreEntry, Verdict
 
@@ -45,19 +45,23 @@ def _detect_kalman_triggers(state: _KFState, entry_count: int) -> list[str]:
         triggers.append("K2:covariance_collapse")
     if any(abs(i) > 0.5 for i in state.innovations):
         triggers.append("K4:large_innovation")
-    if (
+    if _is_stale_innovation(state):
+        triggers.append("K5:no_new_information")
+    return triggers
+
+
+def _is_stale_innovation(state: _KFState) -> bool:
+    return (
         len(state.innovations) >= 3
         and max(state.innovations[-3:]) - min(state.innovations[-3:]) < 0.02
         and state.P > 0.20
-    ):
-        triggers.append("K5:no_new_information")
-    return triggers
+    )
 
 
 class KalmanConvergenceLayer:
     """Bayesian fusion of multi-agent quality scores via Kalman filter."""
 
-    def __init__(self, client: OllamaClient) -> None:
+    def __init__(self, client: ChatBackend) -> None:
         """Initialize with Ollama client and load scorer prompt template."""
         self._client = client
         self._scorer_tpl = jinja2.Template(

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-"""Score eval results — computes metrics from run_eval.py output JSONL files.
+"""
+Score eval results — computes metrics from run_eval.py output JSONL files.
 
 Usage:
     python evals/score.py evals/results/
@@ -28,39 +29,49 @@ def _load_records(path: Path) -> list[dict[str, object]]:
     return records
 
 
+def _compute_json_conformance(records: list[dict[str, object]]) -> int:
+    return sum(
+        1 for r in records if not r.get("critic_used_fallback") and not r.get("judge_used_fallback")
+    )
+
+
+def _compute_recall(records: list[dict[str, object]]) -> list[float]:
+    scores: list[float] = []
+    for r in records:
+        expected: list[str] = cast(list[str], r.get("expected_issue_types", []))
+        missing: list[str] = cast(list[str], r.get("missing_types", []))
+        if expected:
+            scores.append(1.0 - len(missing) / len(expected))
+    return scores
+
+
+def _compute_brier(records: list[dict[str, object]]) -> list[float]:
+    scores: list[float] = []
+    for r in records:
+        correct = 1.0 if r.get("verdict_correct") else 0.0
+        confidence = cast(float, r.get("confidence", 0.0))
+        scores.append((confidence - correct) ** 2)
+    return scores
+
+
+def _percentile(data: list[int], p: int) -> int:
+    if not data:
+        return 0
+    idx = max(0, int(len(data) * p / 100) - 1)
+    return data[idx]
+
+
 def _score(records: list[dict[str, object]]) -> dict[str, object]:
     n = len(records)
     if n == 0:
         return {"error": "no records"}
 
-    json_ok = sum(
-        1 for r in records if not r.get("critic_used_fallback") and not r.get("judge_used_fallback")
-    )
+    json_ok = _compute_json_conformance(records)
     verdict_correct = sum(1 for r in records if r.get("verdict_correct"))
-
-    # Issue-type recall: for each record, what fraction of expected types were found?
-    recall_scores: list[float] = []
-    for r in records:
-        expected: list[str] = cast(list[str], r.get("expected_issue_types", []))
-        missing: list[str] = cast(list[str], r.get("missing_types", []))
-        if expected:
-            recall_scores.append(1.0 - len(missing) / len(expected))
-
-    # Brier score: (confidence - correct)^2, lower is better
-    brier_scores: list[float] = []
-    for r in records:
-        correct = 1.0 if r.get("verdict_correct") else 0.0
-        confidence = cast(float, r.get("confidence", 0.0))
-        brier_scores.append((confidence - correct) ** 2)
-
+    recall_scores = _compute_recall(records)
+    brier_scores = _compute_brier(records)
     latencies = [cast(int, r["total_ms"]) for r in records if "total_ms" in r]
     latencies_sorted = sorted(latencies)
-
-    def _percentile(data: list[int], p: int) -> int:
-        if not data:
-            return 0
-        idx = max(0, int(len(data) * p / 100) - 1)
-        return data[idx]
 
     return {
         "n": n,
