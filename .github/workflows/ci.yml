@@ -16,7 +16,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4  # nosemgrep
+      - uses: actions/checkout@v7  # nosemgrep
       - uses: astral-sh/setup-uv@v4  # nosemgrep
         with:
           version: "latest"
@@ -36,7 +36,7 @@ jobs:
       matrix:
         python-version: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4  # nosemgrep
+      - uses: actions/checkout@v7  # nosemgrep
       - uses: astral-sh/setup-uv@v4  # nosemgrep
         with:
           version: "latest"
