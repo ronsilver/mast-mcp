@@ -56,3 +56,4 @@ config.json
 ~/.config/mast/strategies/
 
 uv.lock
+docs/plans
